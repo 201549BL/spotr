@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect"
+import { Device } from "../domain/Device.ts"
 import { InternalApiChanged, type SpotifyError } from "../domain/errors.ts"
 import { Playlist } from "../domain/Playlist.ts"
 import { PlayerStatus, type Repeat } from "../domain/PlayerStatus.ts"
@@ -139,3 +140,18 @@ export const toPlaylists = (folder: RawFolder, path: ReadonlyArray<string> = [])
   })
 
 export const decodeContains = Schema.decodeUnknownEffect(Schema.Array(Schema.Boolean))
+
+// ConnectDevicesAPI.getDevices(): Spotify Connect devices, this computer
+// included.
+const RawDevices = Schema.Array(Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  type: Schema.String,
+  isActive: Schema.Boolean,
+  isLocal: Schema.Boolean
+}))
+
+export const decodeDevices = Schema.decodeUnknownEffect(RawDevices)
+
+export const toDevices = (raw: typeof RawDevices.Type) =>
+  raw.map(({ id, name, type, isActive, isLocal }) => new Device({ id, name, type, active: isActive, local: isLocal }))

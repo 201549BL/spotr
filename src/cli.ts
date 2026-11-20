@@ -7,6 +7,7 @@ import { parseSeek } from "./domain/Seek.ts"
 import { SpotifyUri, toSpotifyUri } from "./domain/Track.ts"
 import { Volume } from "./domain/Volume.ts"
 import {
+  devicesText,
   likeText,
   playlistAddText,
   playlistsText,
@@ -137,6 +138,19 @@ const playlist = Command.make("playlist").pipe(
   Command.withDescription("List your playlists, or add a track to one")
 )
 
+const devicesUse = Command.make(
+  "use",
+  { device: Argument.String("device").pipe(Argument.withDescription("The device's name or id")) },
+  ({ device }) => Spotify.use((spotify) => spotify.useDevice(device)).pipe(present(devicesText))
+).pipe(Command.withDescription("Move playback to another device"))
+
+const devices = Command.make("devices", {}, () =>
+  Spotify.use((spotify) => spotify.devices).pipe(present(devicesText))
+).pipe(
+  Command.withSubcommands([devicesUse]),
+  Command.withDescription("List Spotify Connect devices, or switch to one")
+)
+
 const volume = Command.make(
   "volume",
   {
@@ -173,6 +187,7 @@ export const spotr = Command.make("spotr").pipe(
     like,
     unlike,
     playlist,
+    devices,
     volume
   ]),
   Command.provide(

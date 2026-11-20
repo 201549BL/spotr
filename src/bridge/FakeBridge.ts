@@ -76,6 +76,14 @@ export const sampleRootlist: SampleFolder = {
   ]
 }
 
+// This computer and two speakers, two of which share a name.
+export const sampleDevices = [
+  { id: "local_device", name: "This Mac", type: "computer", isLocal: true },
+  { id: "speaker-1", name: "Kitchen", type: "speaker", isLocal: false },
+  { id: "speaker-2", name: "Twin Speaker", type: "speaker", isLocal: false },
+  { id: "speaker-3", name: "Twin Speaker", type: "speaker", isLocal: false }
+]
+
 type QueueEntry = { readonly uri: string; readonly uid: string }
 
 type PlayerState = {
@@ -89,6 +97,8 @@ type PlayerState = {
   readonly uids: number
   readonly liked: ReadonlyArray<string>
   readonly playlistAdds: ReadonlyArray<string>
+  readonly activeDevice: string
+  readonly transfers: number
 }
 
 const ItemRef = Schema.Struct({ uri: Schema.String, uid: Schema.optional(Schema.String) })
@@ -112,7 +122,9 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
       removedFromContext: [],
       uids: 0,
       liked: [],
-      playlistAdds: []
+      playlistAdds: [],
+      activeDevice: "local_device",
+      transfers: 0
     }
 
     const state = yield* Ref.make(initial)
@@ -268,6 +280,22 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
         )
       )
 
+    const getDevices = Ref.get(state).pipe(
+      Effect.map((current) => sampleDevices.map((device) => ({ ...device, isActive: device.id === current.activeDevice })))
+    )
+
+    // Real Spotify throws when the logging argument is missing.
+    const transferPlayback = (args: ReadonlyArray<Schema.Json>) =>
+      decodeArgs(Schema.Tuple([Schema.String, Schema.Struct({ interactionId: Schema.String })]))(args).pipe(
+        Effect.orDie,
+        Effect.flatMap(([activeDevice]) =>
+          Ref.update(state, (current) => ({ ...current, activeDevice, transfers: current.transfers + 1 }))
+        )
+      )
+
+    // How many transfers ran, for tests that check none did.
+    const getTransfers = Ref.get(state).pipe(Effect.map((current) => current.transfers))
+
     const handlers = new Map<string, (args: ReadonlyArray<Schema.Json>) => Effect.Effect<unknown>>([
       ["PlayerAPI.getState", () => getState],
       ["PlayerAPI.play", play],
@@ -295,6 +323,9 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
       ["LibraryAPI.contains", contains],
       ["RootlistAPI.getContents", () => rootlist],
       ["PlaylistAPI.add", addToPlaylist],
+      ["ConnectDevicesAPI.getDevices", () => getDevices],
+      ["ConnectTransferAPI.transferPlayback", transferPlayback],
+      ["Test.transfers", () => getTransfers],
       ["PlaybackAPI.getVolume", () => Ref.get(level)],
       ["PlaybackAPI.setVolume", setVolume]
     ])

@@ -1,5 +1,6 @@
 import { Clock, Context, Effect, Layer, Schedule, type Schema } from "effect"
 import { Bridge } from "../bridge/Bridge.ts"
+import type { Device } from "../domain/Device.ts"
 import { NotFound, type SpotifyError } from "../domain/errors.ts"
 import type { PlayerStatus, Repeat } from "../domain/PlayerStatus.ts"
 import { LikeResult, type Playlist, PlaylistAddResult } from "../domain/Playlist.ts"
@@ -10,12 +11,14 @@ import type { Volume } from "../domain/Volume.ts"
 import {
   blameUpdate,
   decodeContains,
+  decodeDevices,
   decodeLevel,
   decodeQueue,
   decodeRootlist,
   decodeState,
   decodeVolume,
   repeatModes,
+  toDevices,
   toPlaylists,
   toStatus,
   toTrack
@@ -42,6 +45,8 @@ export class Spotify extends Context.Service<Spotify, {
     playlist: string,
     uri: SpotifyUri | undefined
   ) => Effect.Effect<PlaylistAddResult, SpotifyError>
+  readonly devices: Effect.Effect<ReadonlyArray<Device>, SpotifyError>
+  readonly useDevice: (device: string) => Effect.Effect<ReadonlyArray<Device>, SpotifyError>
   readonly volume: Effect.Effect<Volume, SpotifyError>
   readonly setVolume: (level: Volume) => Effect.Effect<void, SpotifyError>
 }>()("spotr/Spotify") {
@@ -249,6 +254,37 @@ export class Spotify extends Context.Service<Spotify, {
           return new PlaylistAddResult({ playlist: found, ...track })
         })
 
+      // ConnectDevicesAPI and ConnectTransferAPI exist from startup.
+      // ConnectAPI would do the same job, but creating it starts a
+      // device search on the local network.
+      const devices = bridge.call("ConnectDevicesAPI", "getDevices").pipe(
+        Effect.flatMap(decodeDevices),
+        Effect.map(toDevices),
+        blameUpdate("ConnectDevicesAPI.getDevices")
+      )
+
+      // `device` is an id, or a name matched without regard to case.
+      // Using the device that's already active does nothing.
+      const useDevice = (device: string) =>
+        Effect.gen(function* () {
+          const all = yield* devices
+          const matches = all.filter((candidate) => candidate.id === device || candidate.name.toLowerCase() === device.toLowerCase())
+          const [found] = matches
+
+          if (!found || matches.length > 1) {
+            return yield* new NotFound({
+              what: matches.length > 1 ? `A single device named "${device}"` : `Device "${device}"`,
+              hint: "Run spotr devices to see the devices Spotify can play on."
+            })
+          }
+
+          if (found.active) return all
+
+          yield* bridge.call("ConnectTransferAPI", "transferPlayback", found.id, { interactionId: "" })
+
+          return yield* pollUntil(devices, (now) => now.some((candidate) => candidate.id === found.id && candidate.active))
+        })
+
       const volume = bridge.call("PlaybackAPI", "getVolume").pipe(
         Effect.flatMap(decodeLevel),
         Effect.flatMap((level) => decodeVolume(Math.round(level * 100))),
@@ -276,6 +312,8 @@ export class Spotify extends Context.Service<Spotify, {
         unlike: setLiked(false),
         playlists,
         addToPlaylist,
+        devices,
+        useDevice,
         volume,
         setVolume
       }

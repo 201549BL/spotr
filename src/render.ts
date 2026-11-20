@@ -1,4 +1,5 @@
 import { Console, Effect } from "effect"
+import type { Device } from "./domain/Device.ts"
 import type { SpotifyError } from "./domain/errors.ts"
 import type { PlayerStatus } from "./domain/PlayerStatus.ts"
 import type { LikeResult, Playlist, PlaylistAddResult } from "./domain/Playlist.ts"
@@ -77,6 +78,11 @@ export const playlistsText = (playlists: ReadonlyArray<Playlist>) =>
 
 export const playlistAddText = ({ playlist, uri, name }: PlaylistAddResult) =>
   `Added ${name ?? uri} to ${playlist.name}`
+
+export const devicesText = (devices: ReadonlyArray<Device>) =>
+  devices
+    .map((device) => `${device.active ? "▶" : " "} ${device.name} · ${device.type}${device.local ? " · this computer" : ""}`)
+    .join("\n")
 
 export const shuffleText = ({ shuffle }: PlayerStatus) => `Shuffle ${shuffle ? "on" : "off"}`
 

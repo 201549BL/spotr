@@ -1,9 +1,10 @@
 import { assert, describe, it } from "@effect/vitest"
 import { PlayerStatus } from "../src/domain/PlayerStatus.ts"
+import { Device } from "../src/domain/Device.ts"
 import { LikeResult, Playlist, PlaylistAddResult } from "../src/domain/Playlist.ts"
 import { Queue } from "../src/domain/Queue.ts"
 import { SpotifyUri, Track } from "../src/domain/Track.ts"
-import { likeText, playlistAddText, playlistsText, queueText, repeatText, shuffleText, statusText } from "../src/render.ts"
+import { devicesText, likeText, playlistAddText, playlistsText, queueText, repeatText, shuffleText, statusText } from "../src/render.ts"
 
 const track = new Track({
   uri: SpotifyUri.make("spotify:track:1111111111111111111111"),
@@ -88,5 +89,17 @@ describe("library text", () => {
       "Work / Focus · 1 track\nMix · 30 tracks · read-only"
     )
     assert.strictEqual(playlistsText([]), "No playlists")
+  })
+})
+
+describe("devicesText", () => {
+  it("marks the active device and this computer", () => {
+    assert.strictEqual(
+      devicesText([
+        new Device({ id: "local_device", name: "This Mac", type: "computer", active: false, local: true }),
+        new Device({ id: "speaker-1", name: "Kitchen", type: "speaker", active: true, local: false })
+      ]),
+      "  This Mac · computer · this computer\n▶ Kitchen · speaker"
+    )
   })
 })
