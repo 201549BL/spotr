@@ -1,7 +1,8 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Option } from "effect"
+import { Option, Schema } from "effect"
 import { formatTime, parseSeek } from "../src/domain/Seek.ts"
-import { toSpotifyUri } from "../src/domain/Track.ts"
+import { SpotifyUri, toSpotifyUri } from "../src/domain/Track.ts"
+import { parseVolumeChange } from "../src/domain/Volume.ts"
 
 describe("parseSeek", () => {
   it("reads absolute and relative positions", () => {
@@ -39,8 +40,55 @@ describe("toSpotifyUri", () => {
     )
   })
 
+  it("turns liked into the Liked Songs URI", () => {
+    assert.strictEqual(toSpotifyUri("liked"), "spotify:collection:tracks")
+    assert.strictEqual(toSpotifyUri("https://open.spotify.com/collection/tracks"), "spotify:collection:tracks")
+  })
+
   it("leaves URIs and other input alone", () => {
     assert.strictEqual(toSpotifyUri("spotify:playlist:abc"), "spotify:playlist:abc")
     assert.strictEqual(toSpotifyUri("hello"), "hello")
+  })
+})
+
+describe("SpotifyUri", () => {
+  const valid = Schema.is(SpotifyUri)
+
+  it("accepts tracks, Liked Songs, user collections and local files", () => {
+    assert.deepStrictEqual(
+      [
+        "spotify:track:1111111111111111111111",
+        "spotify:collection:tracks",
+        "spotify:user:someone:collection",
+        "spotify:local:Some+Artist::Some+Song:215"
+      ].map(valid),
+      [true, true, true, true]
+    )
+  })
+
+  it("rejects anything that isn't a spotify: URI", () => {
+    assert.deepStrictEqual(
+      ["notauri", "spotify:", "spotify:track", "spotify:track:", "spotify:track:has space", "https://example.com"].map(valid),
+      [false, false, false, false, false, false]
+    )
+  })
+})
+
+describe("parseVolumeChange", () => {
+  it("reads levels and changes", () => {
+    assert.deepStrictEqual(parseVolumeChange("40"), Option.some({ relative: false, amount: 40 }))
+    assert.deepStrictEqual(parseVolumeChange("0"), Option.some({ relative: false, amount: 0 }))
+    assert.deepStrictEqual(parseVolumeChange("+10"), Option.some({ relative: true, amount: 10 }))
+    assert.deepStrictEqual(parseVolumeChange("-5"), Option.some({ relative: true, amount: -5 }))
+  })
+
+  it("rejects levels above 100 and anything else", () => {
+    assert.deepStrictEqual(["101", "loud", "", "+", "1.5"].map(parseVolumeChange), [
+      Option.none(),
+      Option.none(),
+      Option.none(),
+      Option.none(),
+      Option.none()
+    ])
   })
 })

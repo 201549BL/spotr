@@ -62,7 +62,7 @@ describe("doctor", () => {
         "pass Spotify's window is open",
         "pass spotr's agent reaches Spotify's internals",
         "pass PlayerAPI has the 13 methods spotr uses",
-        "pass PlaybackAPI has the 2 methods spotr uses",
+        "pass PlaybackAPI has the 5 methods spotr uses",
         "pass LibraryAPI has the 3 methods spotr uses",
         "pass RootlistAPI has the 6 methods spotr uses",
         "pass PlaylistAPI has the method spotr uses",

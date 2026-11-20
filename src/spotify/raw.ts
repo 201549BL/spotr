@@ -145,6 +145,8 @@ export const decodeContains = Schema.decodeUnknownEffect(Schema.Array(Schema.Boo
 // failed.
 export const decodeCreated = Schema.decodeUnknownEffect(Schema.NullOr(SpotifyUri))
 
+export const decodeMuted = Schema.decodeUnknownEffect(Schema.Boolean)
+
 export const decodePublished = Schema.decodeUnknownEffect(Schema.Boolean)
 
 // ConnectDevicesAPI.getDevices(): Spotify Connect devices, this computer

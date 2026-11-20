@@ -13,8 +13,8 @@ import {
 } from "../domain/Playlist.ts"
 import { Queue } from "../domain/Queue.ts"
 import type { SeekTarget } from "../domain/Seek.ts"
-import type { SpotifyUri } from "../domain/Track.ts"
-import type { Volume } from "../domain/Volume.ts"
+import { likedSongs, type SpotifyUri } from "../domain/Track.ts"
+import { type VolumeChange, VolumeStatus } from "../domain/Volume.ts"
 import {
   blameUpdate,
   decodeContains,
@@ -22,6 +22,7 @@ import {
   decodePublished,
   decodeDevices,
   decodeLevel,
+  decodeMuted,
   decodeQueue,
   decodeRootlist,
   decodeState,
@@ -51,7 +52,8 @@ const uses = {
     "removeFromQueue",
     "clearQueue"
   ],
-  PlaybackAPI: ["getVolume", "setVolume"],
+  // "getMuteHelper.mute" means getMuteHelper(), then mute() on its result.
+  PlaybackAPI: ["getVolume", "setVolume", "getMuteHelper.isMuted", "getMuteHelper.mute", "getMuteHelper.unmute"],
   LibraryAPI: ["add", "remove", "contains"],
   RootlistAPI: ["getContents", "contains", "createPlaylist", "remove", "setPublishedState", "getPublishedState"],
   PlaylistAPI: ["add"],
@@ -93,8 +95,11 @@ export class Spotify extends Context.Service<Spotify, {
   readonly deletePlaylist: (playlist: string, confirmed: boolean) => Effect.Effect<DeletedPlaylist, SpotifyError>
   readonly devices: Effect.Effect<ReadonlyArray<Device>, SpotifyError>
   readonly useDevice: (device: string) => Effect.Effect<ReadonlyArray<Device>, SpotifyError>
-  readonly volume: Effect.Effect<Volume, SpotifyError>
-  readonly setVolume: (level: Volume) => Effect.Effect<void, SpotifyError>
+  readonly toggle: Effect.Effect<PlayerStatus, SpotifyError>
+  readonly volume: Effect.Effect<VolumeStatus, SpotifyError>
+  readonly setVolume: (change: VolumeChange) => Effect.Effect<VolumeStatus, SpotifyError>
+  readonly mute: Effect.Effect<VolumeStatus, SpotifyError>
+  readonly unmute: Effect.Effect<VolumeStatus, SpotifyError>
   // Emits the status now, then again whenever the track or play state
   // changes. It checks once a second.
   readonly watch: Stream.Stream<PlayerStatus, SpotifyError>
@@ -135,7 +140,10 @@ export class Spotify extends Context.Service<Spotify, {
           yield* command("play", { uri }, {}, {})
 
           return yield* settle((now) => {
-            const playingIt = !now.paused && (now.track?.uri === uri || now.context === uri)
+            // Spotify plays Liked Songs from a playlist with its own URI.
+            const fromUri = now.track?.uri === uri || now.context === uri || uri === likedSongs
+
+            const playingIt = !now.paused && fromUri
 
             const changed = before.paused || now.track?.uri !== before.track?.uri ||
               now.context !== before.context || now.positionMs < before.positionMs
@@ -401,14 +409,37 @@ export class Spotify extends Context.Service<Spotify, {
           return yield* pollUntil(devices, (now) => now.some((candidate) => candidate.id === found.id && candidate.active))
         })
 
-      const volume = call("PlaybackAPI", "getVolume").pipe(
-        Effect.flatMap(decodeLevel),
-        Effect.flatMap((level) => decodeVolume(Math.round(level * 100))),
-        blameUpdate("PlaybackAPI.getVolume")
+      const toggle = Effect.flatMap(status, (now) => now.paused ? resume : pause)
+
+      const volume = Effect.gen(function* () {
+        const level = yield* call("PlaybackAPI", "getVolume").pipe(Effect.flatMap(decodeLevel))
+        const volume = yield* decodeVolume(Math.round(level * 100))
+        const muted = yield* call("PlaybackAPI", "getMuteHelper.isMuted").pipe(Effect.flatMap(decodeMuted))
+
+        return new VolumeStatus({ volume, muted })
+      }).pipe(blameUpdate("PlaybackAPI.getVolume"))
+
+      // A change is applied to the current level and kept within 0 to 100.
+      // Spotify's mute helper follows the volume: 0 mutes, anything else
+      // unmutes.
+      const setVolume = (change: VolumeChange) =>
+        Effect.gen(function* () {
+          const before = yield* volume
+          const wanted = change.relative ? before.volume + change.amount : change.amount
+          const level = Math.max(0, Math.min(100, wanted))
+
+          yield* call("PlaybackAPI", "setVolume", level / 100)
+
+          return yield* pollUntil(volume, (now) => now.volume === level)
+        })
+
+      const mute = call("PlaybackAPI", "getMuteHelper.mute").pipe(
+        Effect.andThen(pollUntil(volume, (now) => now.muted))
       )
 
-      const setVolume = (level: Volume) =>
-        call("PlaybackAPI", "setVolume", level / 100).pipe(Effect.asVoid)
+      const unmute = call("PlaybackAPI", "getMuteHelper.unmute").pipe(
+        Effect.andThen(pollUntil(volume, (now) => !now.muted))
+      )
 
       const watch = Stream.fromEffectSchedule(status, Schedule.spaced("1 second")).pipe(Stream.changesWith(sameMoment))
 
@@ -471,8 +502,11 @@ export class Spotify extends Context.Service<Spotify, {
         deletePlaylist,
         devices,
         useDevice,
+        toggle,
         volume,
         setVolume,
+        mute,
+        unmute,
         watch,
         doctor
       }

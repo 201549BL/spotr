@@ -1,15 +1,22 @@
 import { Schema } from "effect"
 
+// "spotify:" and a kind, then colon-separated parts ending in a non-empty
+// one. Most are "spotify:track:<id>", but Liked Songs is
+// "spotify:collection:tracks" and local files have several parts, some
+// of them empty.
 export const SpotifyUri = Schema.String.pipe(
-  Schema.check(Schema.isPattern(/^spotify:[a-z]+:[A-Za-z0-9]+$/)),
+  Schema.check(Schema.isPattern(/^spotify:[a-z]+(?::[^\s:]*)*:[^\s:]+$/)),
   Schema.brand("SpotifyUri")
 )
 
 export type SpotifyUri = typeof SpotifyUri.Type
 
-// Turns an open.spotify.com link into a spotify: URI. Anything else is
-// returned unchanged, so SpotifyUri can reject it.
+export const likedSongs = "spotify:collection:tracks"
+
+// Turns an open.spotify.com link, or the word "liked", into a spotify:
+// URI. Anything else is returned unchanged, so SpotifyUri can reject it.
 export const toSpotifyUri = (input: string) => {
+  if (input === "liked") return likedSongs
   const link = input.match(/^https?:\/\/open\.spotify\.com\/(?:intl-[a-z-]+\/)?([a-z]+)\/([A-Za-z0-9]+)/)
 
   return link ? `spotify:${link[1]}:${link[2]}` : input

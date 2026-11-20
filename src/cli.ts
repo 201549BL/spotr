@@ -6,7 +6,7 @@ import { CdpBridge } from "./bridge/CdpBridge.ts"
 import { ChecksFailed } from "./domain/errors.ts"
 import { parseSeek } from "./domain/Seek.ts"
 import { SpotifyUri, toSpotifyUri } from "./domain/Track.ts"
-import { Volume } from "./domain/Volume.ts"
+import { parseVolumeChange } from "./domain/Volume.ts"
 import {
   createdText,
   deletedText,
@@ -42,7 +42,7 @@ const status = Command.make("status", {}, () =>
 
 const play = Command.make(
   "play",
-  { uri: uriArgument("A spotify: URI or open.spotify.com link to play").pipe(Argument.optional) },
+  { uri: uriArgument("A spotify: URI, an open.spotify.com link, or \"liked\" for Liked Songs").pipe(Argument.optional) },
   ({ uri }) =>
     Spotify.use((spotify) =>
       Option.match(uri, { onNone: () => spotify.resume, onSome: spotify.play })
@@ -211,23 +211,29 @@ const doctor = Command.make("doctor", {}, () =>
 const volume = Command.make(
   "volume",
   {
-    level: Argument.Int("level").pipe(
-      Argument.withDescription("New volume, from 0 to 100"),
-      Argument.withSchema(Volume),
+    change: Argument.String("level").pipe(
+      Argument.withDescription("40 sets the level, +10 or -10 changes it"),
+      Argument.filterMap(parseVolumeChange, (input) => `Expected 0 to 100, or a change like +10 or -10, got "${input}"`),
       Argument.optional
     )
   },
-  ({ level }) =>
+  ({ change }) =>
     Spotify.use((spotify) =>
-      Option.match(level, {
-        onNone: () => spotify.volume,
-        onSome: (wanted) => spotify.setVolume(wanted).pipe(Effect.as(wanted))
-      })
-    ).pipe(
-      Effect.map((current) => ({ volume: current })),
-      present(volumeText)
-    )
-).pipe(Command.withDescription("Show the volume, or set it"))
+      Option.match(change, { onNone: () => spotify.volume, onSome: spotify.setVolume })
+    ).pipe(present(volumeText))
+).pipe(Command.withDescription("Show the volume, or change it"))
+
+const mute = Command.make("mute", {}, () =>
+  Spotify.use((spotify) => spotify.mute).pipe(present(volumeText))
+).pipe(Command.withDescription("Mute Spotify"))
+
+const unmute = Command.make("unmute", {}, () =>
+  Spotify.use((spotify) => spotify.unmute).pipe(present(volumeText))
+).pipe(Command.withDescription("Unmute Spotify, back to the volume before muting"))
+
+const toggle = Command.make("toggle", {}, () =>
+  Spotify.use((spotify) => spotify.toggle).pipe(present(statusText))
+).pipe(Command.withDescription("Pause if playing, resume if paused"))
 
 export const spotr = Command.make("spotr").pipe(
   Command.withSubcommands([
@@ -235,6 +241,7 @@ export const spotr = Command.make("spotr").pipe(
     play,
     pause,
     resume,
+    toggle,
     next,
     previous,
     seek,
@@ -246,6 +253,8 @@ export const spotr = Command.make("spotr").pipe(
     playlist,
     devices,
     volume,
+    mute,
+    unmute,
     watch,
     launch,
     doctor

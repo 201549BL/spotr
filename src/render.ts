@@ -13,7 +13,7 @@ import type {
 import type { Queue } from "./domain/Queue.ts"
 import type { Track } from "./domain/Track.ts"
 import { formatTime } from "./domain/Seek.ts"
-import type { Volume } from "./domain/Volume.ts"
+import type { VolumeStatus } from "./domain/Volume.ts"
 import { Json } from "./settings.ts"
 
 // Commands return data. This is the one place that decides how it
@@ -131,4 +131,4 @@ export const shuffleText = ({ shuffle }: PlayerStatus) => `Shuffle ${shuffle ? "
 
 export const repeatText = ({ repeat }: PlayerStatus) => `Repeat ${repeat}`
 
-export const volumeText = ({ volume }: { readonly volume: Volume }) => `Volume ${volume}%`
+export const volumeText = ({ volume, muted }: VolumeStatus) => muted ? "Muted" : `Volume ${volume}%`

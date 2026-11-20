@@ -9,9 +9,12 @@ type InternalValue = { readonly [opaque]: "InternalValue" }
 
 type Json = null | number | boolean | string | ReadonlyArray<Json> | { readonly [key: string]: Json }
 
-type InternalMethod = (...args: ReadonlyArray<Json>) => Promise<InternalValue | undefined> | InternalValue | undefined
-
 type InternalApi = { readonly [method: string]: InternalMethod | undefined }
+
+// A method may also return another API-like object, as getMuteHelper() does.
+type InternalResult = InternalValue | InternalApi | undefined
+
+type InternalMethod = (...args: ReadonlyArray<Json>) => Promise<InternalResult> | InternalResult
 
 // Spotify registers each API under a Symbol whose description is the
 // API's name, e.g. Symbol("PlayerAPI").
@@ -54,7 +57,7 @@ declare global {
 }
 
 export const installAgent = (): Agent => {
-  const version = 4
+  const version = 5
 
   if (window.__spotr?.version === version) return window.__spotr
 
@@ -112,19 +115,36 @@ export const installAgent = (): Agent => {
 
       if (!target) return { ok: false, kind: "ApiMissing", message: `No internal API named ${api}` }
 
-      return { ok: true, value: methods.filter((method) => !target[method]) }
+      // For a path like "getMuteHelper.mute" only the first step is
+      // checked, since checking the rest would mean calling the getter.
+      return { ok: true, value: methods.filter((method) => !target[method.split(".")[0] ?? method]) }
     },
     async dispatch(api, method, args) {
       if (!registry) return { ok: false, kind: "NotReady", message: "Spotify's internal registry wasn't found" }
       const target = resolveApi(api)
 
       if (!target) return { ok: false, kind: "ApiMissing", message: `No internal API named ${api}` }
-      const fn = target[method]
-
-      if (!fn) return { ok: false, kind: "MethodMissing", message: `${api} has no method ${method}` }
 
       try {
-        const value = await fn.call(target, ...args)
+        // "getMuteHelper.mute" calls getMuteHelper() first, then mute()
+        // on what it returns.
+        const steps = method.split(".")
+        const last = steps.pop() ?? method
+        let owner: InternalApi | undefined = target
+
+        for (const step of steps) {
+          const getter: InternalMethod | undefined = owner?.[step]
+
+          // SAFETY: every step before the last names a getter, such as
+          // getMuteHelper, that returns another API object.
+          owner = getter ? await getter.call(owner) as InternalApi | undefined : undefined
+        }
+
+        const fn = owner?.[last]
+
+        if (!owner || !fn) return { ok: false, kind: "MethodMissing", message: `${api} has no method ${method}` }
+
+        const value = await fn.call(owner, ...args)
 
         // A JSON round trip turns Spotify's class instances into plain
         // data that survives the trip back over the DevTools socket.

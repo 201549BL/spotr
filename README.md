@@ -41,13 +41,15 @@ While the port is open, other programs on this computer can control Spotify too.
 | Command | What it does |
 | --- | --- |
 | `spotr status` | Show the track, position, shuffle, repeat and liked state |
-| `spotr play [uri]` | Play a track, album, playlist or artist. No argument resumes |
+| `spotr play [uri]` | Play a track, album, playlist or artist. `spotr play liked` plays Liked Songs. No argument resumes |
 | `spotr pause` / `spotr resume` | Pause or resume |
+| `spotr toggle` | Pause if playing, resume if paused |
 | `spotr next` / `spotr previous` | Skip forward or back. `previous` restarts the track when it's a few seconds in |
 | `spotr seek <pos>` | `1:30` or `90` jumps there, `+10` or `-10` moves by seconds |
 | `spotr shuffle [on\|off]` | Show or set shuffle |
 | `spotr repeat [off\|all\|one]` | Show or set repeat |
-| `spotr volume [0-100]` | Show or set the volume |
+| `spotr volume [level]` | Show the volume. `40` sets it, `+10` or `-10` changes it |
+| `spotr mute` / `spotr unmute` | Mute, or go back to the volume from before muting |
 | `spotr queue` | Show the current track, your queue and what's next |
 | `spotr queue add <uri>` | Add a track to the end of your queue |
 | `spotr queue remove <uri>` | Remove a track you queued |
@@ -65,7 +67,7 @@ While the port is open, other programs on this computer can control Spotify too.
 
 A deleted playlist can be recovered for a while at spotify.com/account/recover-playlists.
 
-Wherever a command takes a URI, you can also paste an `open.spotify.com` link.
+Wherever a command takes a URI, you can also paste an `open.spotify.com` link. Liked Songs (`spotify:collection:tracks`) and local files (`spotify:local:…`) work too.
 
 Every command accepts `--json` for machine-readable output, and `--port` (or `SPOTR_PORT`) for a DevTools port other than 9222. `watch --json` prints one JSON object per line.
 

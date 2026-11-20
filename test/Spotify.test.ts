@@ -4,7 +4,7 @@ import { TestClock } from "effect/testing"
 import { FakeBridge, sampleContext, sampleQueue } from "../src/bridge/FakeBridge.ts"
 import type { PlayerStatus } from "../src/domain/PlayerStatus.ts"
 import { SpotifyUri } from "../src/domain/Track.ts"
-import { Volume } from "../src/domain/Volume.ts"
+import type { VolumeStatus } from "../src/domain/Volume.ts"
 import { Spotify } from "../src/spotify/Spotify.ts"
 
 const spotifyWith = (staleReads: number) =>
@@ -143,12 +143,49 @@ describe("Spotify", () => {
       assert.isFalse((yield* withTime(spotify.setShuffle(false), "300 millis")).shuffle)
     }).pipe(Effect.provide(spotifyWith(2))))
 
-  it.effect("setVolume sends a level that volume reads back", () =>
+  it.effect("sets the volume, changes it by steps, and keeps it within 0 to 100", () =>
+    Effect.gen(function* () {
+      const spotify = yield* Spotify
+      const level = (status: VolumeStatus) => `${status.volume}${status.muted ? " muted" : ""}`
+
+      assert.strictEqual(level(yield* spotify.volume), "100")
+      assert.strictEqual(level(yield* spotify.setVolume({ relative: false, amount: 30 })), "30")
+      assert.strictEqual(level(yield* spotify.setVolume({ relative: true, amount: 15 })), "45")
+      assert.strictEqual(level(yield* spotify.setVolume({ relative: true, amount: -60 })), "0 muted")
+      assert.strictEqual(level(yield* spotify.setVolume({ relative: true, amount: 250 })), "100")
+    }).pipe(Effect.provide(spotifyWith(0))))
+
+  it.effect("mute remembers the volume, and unmute brings it back", () =>
+    Effect.gen(function* () {
+      const spotify = yield* Spotify
+      const level = (status: VolumeStatus) => `${status.volume}${status.muted ? " muted" : ""}`
+
+      yield* spotify.setVolume({ relative: false, amount: 40 })
+
+      assert.strictEqual(level(yield* spotify.mute), "0 muted")
+      assert.strictEqual(level(yield* spotify.mute), "0 muted")
+      assert.strictEqual(level(yield* spotify.unmute), "40")
+      assert.strictEqual(level(yield* spotify.unmute), "40")
+    }).pipe(Effect.provide(spotifyWith(0))))
+
+  it.effect("toggle pauses when playing and resumes when paused", () =>
     Effect.gen(function* () {
       const spotify = yield* Spotify
 
-      assert.strictEqual(yield* spotify.volume, 100)
-      yield* spotify.setVolume(Volume.make(30))
-      assert.strictEqual(yield* spotify.volume, 30)
-    }).pipe(Effect.provide(spotifyWith(0))))
+      assert.isTrue((yield* withTime(spotify.toggle, "300 millis")).paused)
+      assert.isFalse((yield* withTime(spotify.toggle, "300 millis")).paused)
+    }).pipe(Effect.provide(spotifyWith(2))))
+
+  it.effect("play liked starts Liked Songs, which Spotify plays from a playlist of its own", () =>
+    Effect.gen(function* () {
+      const spotify = yield* Spotify
+
+      yield* withTime(spotify.pause, "300 millis")
+
+      assert.deepStrictEqual(summary(yield* withTime(spotify.play(SpotifyUri.make("spotify:collection:tracks")), "300 millis")), {
+        track: "First Song",
+        paused: false,
+        positionMs: 0
+      })
+    }).pipe(Effect.provide(spotifyWith(2))))
 })

@@ -31,7 +31,8 @@ const player = {
   fail: () => {
     throw new Error("nope")
   },
-  later: async () => 42
+  later: async () => 42,
+  getHelper: () => ({ double: (value: number) => value * 2 })
 }
 
 const registry = {
@@ -75,6 +76,21 @@ describe("page agent", () => {
     assert.deepStrictEqual(await dispatch(agent, "PlayerAPI", "setVolume", [0.5, 1]), { ok: true, value: null })
     assert.deepStrictEqual(await dispatch(agent, "PlayerAPI", "later", []), { ok: true, value: 42 })
     assert.deepStrictEqual(received, [[0.5, 1]])
+  })
+
+  it("follows a getter for a method path like getHelper.double", async () => {
+    const agent = install()
+
+    assert.deepStrictEqual(await dispatch(agent, "PlayerAPI", "getHelper.double", [21]), { ok: true, value: 42 })
+    assert.deepStrictEqual(await dispatch(agent, "PlayerAPI", "getHelper.triple", [1]), {
+      ok: false,
+      kind: "MethodMissing",
+      message: "PlayerAPI has no method getHelper.triple"
+    })
+    assert.deepStrictEqual(agent.inspect("PlayerAPI", ["getHelper.double", "getNothing.double"]), {
+      ok: true,
+      value: ["getNothing.double"]
+    })
   })
 
   it("returns plain objects rather than Spotify's class instances", async () => {

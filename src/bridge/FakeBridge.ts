@@ -144,7 +144,16 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
     const state = yield* Ref.make(initial)
     const shown = yield* Ref.make(initial)
     const staleLeft = yield* Ref.make(0)
-    const level = yield* Ref.make(1)
+    // Like Spotify's mute helper: any volume change records the last
+    // non-zero level, and 0 counts as muted.
+    const sound = yield* Ref.make({ level: 1, muted: false, behindMute: 1 })
+
+    const changeLevel = (level: number) =>
+      Ref.update(sound, (current) => ({
+        level,
+        muted: level === 0,
+        behindMute: level === 0 ? current.behindMute : level
+      }))
 
     const getState = Effect.gen(function* () {
       const stale = yield* Ref.getAndUpdate(staleLeft, (left) => Math.max(0, left - 1))
@@ -171,7 +180,9 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
       decodeArgs(Schema.Tuple([Schema.Struct({ uri: Schema.String }), Schema.Unknown, Schema.Unknown]))(args).pipe(
         Effect.orDie,
         Effect.flatMap(([{ uri }]) => {
-          const index = uri === sampleContext ? 0 : queue.findIndex((track) => track.uri === uri)
+          // Liked Songs and the sample album both start from the top.
+          const fromTop = uri === sampleContext || uri === "spotify:collection:tracks"
+          const index = fromTop ? 0 : queue.findIndex((track) => track.uri === uri)
 
           return index < 0
             ? Effect.die(`FakeBridge can't play ${uri}`)
@@ -195,7 +206,7 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
     const setVolume = (args: ReadonlyArray<Schema.Json>) =>
       decodeArgs(Schema.Tuple([Schema.Finite]))(args).pipe(
         Effect.orDie,
-        Effect.flatMap(([next]) => Ref.set(level, next))
+        Effect.flatMap(([next]) => changeLevel(next))
       )
 
     const lookup = (uri: string) => [...queue, sampleExtra].find((track) => track.uri === uri)
@@ -409,8 +420,17 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
       ["ConnectDevicesAPI.getDevices", () => getDevices],
       ["ConnectTransferAPI.transferPlayback", transferPlayback],
       ["Test.transfers", () => getTransfers],
-      ["PlaybackAPI.getVolume", () => Ref.get(level)],
-      ["PlaybackAPI.setVolume", setVolume]
+      ["PlaybackAPI.getVolume", () => Ref.get(sound).pipe(Effect.map((current) => current.level))],
+      ["PlaybackAPI.setVolume", setVolume],
+      ["PlaybackAPI.getMuteHelper.isMuted", () => Ref.get(sound).pipe(Effect.map((current) => current.muted))],
+      [
+        "PlaybackAPI.getMuteHelper.mute",
+        () => Ref.update(sound, (current) => current.muted ? current : { level: 0, muted: true, behindMute: current.level })
+      ],
+      [
+        "PlaybackAPI.getMuteHelper.unmute",
+        () => Ref.update(sound, (current) => current.muted ? { ...current, level: current.behindMute, muted: false } : current)
+      ]
     ])
 
     return {

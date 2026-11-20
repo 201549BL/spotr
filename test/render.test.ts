@@ -5,7 +5,8 @@ import { Device } from "../src/domain/Device.ts"
 import { CreatedPlaylist, DeletedPlaylist, LikeResult, Playlist, PlaylistAddResult } from "../src/domain/Playlist.ts"
 import { Queue } from "../src/domain/Queue.ts"
 import { SpotifyUri, Track } from "../src/domain/Track.ts"
-import { createdText, deletedText, devicesText, doctorText, launchText, likeText, watchText, playlistAddText, playlistsText, queueText, repeatText, shuffleText, statusText } from "../src/render.ts"
+import { Volume, VolumeStatus } from "../src/domain/Volume.ts"
+import { volumeText, createdText, deletedText, devicesText, doctorText, launchText, likeText, watchText, playlistAddText, playlistsText, queueText, repeatText, shuffleText, statusText } from "../src/render.ts"
 
 const track = new Track({
   uri: SpotifyUri.make("spotify:track:1111111111111111111111"),
@@ -105,6 +106,13 @@ describe("devicesText", () => {
       ]),
       "  This Mac · computer · this computer\n▶ Kitchen · speaker"
     )
+  })
+})
+
+describe("volumeText", () => {
+  it("shows the level, or that Spotify is muted", () => {
+    assert.strictEqual(volumeText(new VolumeStatus({ volume: Volume.make(40), muted: false })), "Volume 40%")
+    assert.strictEqual(volumeText(new VolumeStatus({ volume: Volume.make(0), muted: true })), "Muted")
   })
 })
 
