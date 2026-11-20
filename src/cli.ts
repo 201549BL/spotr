@@ -6,7 +6,7 @@ import { CdpBridge } from "./bridge/CdpBridge.ts"
 import { parseSeek } from "./domain/Seek.ts"
 import { SpotifyUri, toSpotifyUri } from "./domain/Track.ts"
 import { Volume } from "./domain/Volume.ts"
-import { present, repeatText, shuffleText, statusText, volumeText } from "./render.ts"
+import { present, queueText, repeatText, shuffleText, statusText, volumeText } from "./render.ts"
 import { Json, Port } from "./settings.ts"
 import { Spotify } from "./spotify/Spotify.ts"
 
@@ -75,6 +75,25 @@ const repeat = Command.make(
     ).pipe(present(repeatText))
 ).pipe(Command.withDescription("Show repeat, or set it to off, all or one"))
 
+const queueAdd = Command.make("add", { uri: uriArgument("The track to add") }, ({ uri }) =>
+  Spotify.use((spotify) => spotify.addToQueue(uri)).pipe(present(queueText))
+).pipe(Command.withDescription("Add a track to the end of your queue"))
+
+const queueRemove = Command.make("remove", { uri: uriArgument("The queued track to remove") }, ({ uri }) =>
+  Spotify.use((spotify) => spotify.removeFromQueue(uri)).pipe(present(queueText))
+).pipe(Command.withDescription("Remove a track you queued"))
+
+const queueClear = Command.make("clear", {}, () =>
+  Spotify.use((spotify) => spotify.clearQueue).pipe(present(queueText))
+).pipe(Command.withDescription("Remove everything you queued"))
+
+const queue = Command.make("queue", {}, () =>
+  Spotify.use((spotify) => spotify.queue).pipe(present(queueText))
+).pipe(
+  Command.withSubcommands([queueAdd, queueRemove, queueClear]),
+  Command.withDescription("Show what plays next, or change your queue")
+)
+
 const volume = Command.make(
   "volume",
   {
@@ -97,7 +116,7 @@ const volume = Command.make(
 ).pipe(Command.withDescription("Show the volume, or set it"))
 
 export const spotr = Command.make("spotr").pipe(
-  Command.withSubcommands([status, play, pause, resume, next, previous, seek, shuffle, repeat, volume]),
+  Command.withSubcommands([status, play, pause, resume, next, previous, seek, shuffle, repeat, queue, volume]),
   Command.provide(
     Spotify.layer.pipe(
       Layer.provide(CdpBridge),

@@ -1,7 +1,8 @@
 import { assert, describe, it } from "@effect/vitest"
 import { PlayerStatus } from "../src/domain/PlayerStatus.ts"
+import { Queue } from "../src/domain/Queue.ts"
 import { SpotifyUri, Track } from "../src/domain/Track.ts"
-import { repeatText, shuffleText, statusText } from "../src/render.ts"
+import { queueText, repeatText, shuffleText, statusText } from "../src/render.ts"
 
 const track = new Track({
   uri: SpotifyUri.make("spotify:track:1111111111111111111111"),
@@ -44,5 +45,31 @@ describe("mode text", () => {
   it("shows shuffle and repeat", () => {
     assert.strictEqual(shuffleText(playing), "Shuffle on")
     assert.strictEqual(repeatText(playing), "Repeat all")
+  })
+})
+
+describe("queueText", () => {
+  it("lists the current track, the queue and what's next", () => {
+    const other = new Track({ ...track, name: "Second Song", artists: ["Other Artist"] })
+
+    assert.strictEqual(
+      queueText(new Queue({ current: track, queued: [other], nextUp: [] })),
+      "Now playing: First Song · Some Artist, Guest\nQueued:\n  1. Second Song · Other Artist"
+    )
+  })
+
+  it("says when nothing is queued, and shortens a long list", () => {
+    const text = queueText(new Queue({ current: null, queued: [], nextUp: Array.from({ length: 12 }, () => track) }))
+
+    assert.strictEqual(
+      text,
+      [
+        "Nothing playing",
+        "Queued: nothing",
+        "Next up:",
+        ...Array.from({ length: 10 }, (_, index) => `  ${index + 1}. First Song · Some Artist, Guest`),
+        "  … and 2 more"
+      ].join("\n")
+    )
   })
 })

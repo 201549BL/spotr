@@ -25,13 +25,28 @@ export const sampleQueue: ReadonlyArray<RawTrack> = [
   }
 ]
 
+// A track outside the sample album, for queueing.
+export const sampleExtra: RawTrack = {
+  uri: "spotify:track:3333333333333333333333",
+  name: "Extra Song",
+  artists: [{ name: "Someone Else" }],
+  duration: { milliseconds: 150_000 }
+}
+
+type QueueEntry = { readonly uri: string; readonly uid: string }
+
 type PlayerState = {
   readonly index: number
   readonly paused: boolean
   readonly positionMs: number
   readonly shuffle: boolean
   readonly repeat: number
+  readonly queued: ReadonlyArray<QueueEntry>
+  readonly removedFromContext: ReadonlyArray<string>
+  readonly uids: number
 }
+
+const ItemRef = Schema.Struct({ uri: Schema.String, uid: Schema.optional(Schema.String) })
 
 const decodeArgs = <S extends Schema.Top>(schema: S) => Schema.decodeUnknownEffect(schema)
 
@@ -42,7 +57,17 @@ const decodeArgs = <S extends Schema.Top>(schema: S) => Schema.decodeUnknownEffe
 export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) => Layer.effect(
   Bridge,
   Effect.gen(function* () {
-    const initial: PlayerState = { index: 0, paused: false, positionMs: 0, shuffle: false, repeat: 0 }
+    const initial: PlayerState = {
+      index: 0,
+      paused: false,
+      positionMs: 0,
+      shuffle: false,
+      repeat: 0,
+      queued: [],
+      removedFromContext: [],
+      uids: 0
+    }
+
     const state = yield* Ref.make(initial)
     const shown = yield* Ref.make(initial)
     const staleLeft = yield* Ref.make(0)
@@ -100,6 +125,56 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
         Effect.flatMap(([next]) => Ref.set(level, next))
       )
 
+    const lookup = (uri: string) => [...queue, sampleExtra].find((track) => track.uri === uri)
+
+    const getQueue = Ref.get(state).pipe(
+      Effect.map((current) => ({
+        current: queue[current.index % queue.length] ?? null,
+        queued: current.queued.flatMap(({ uri, uid }) => {
+          const track = lookup(uri)
+
+          return track ? [{ ...track, uid, provider: "queue" }] : []
+        }),
+        nextUp: queue.slice(current.index + 1).flatMap((track, offset) =>
+          current.removedFromContext.includes(track.uri)
+            ? []
+            : [{ ...track, uid: `context-${current.index + 1 + offset}`, provider: "context" }]
+        )
+      }))
+    )
+
+    const addToQueue = (args: ReadonlyArray<Schema.Json>) =>
+      decodeArgs(Schema.Tuple([Schema.Array(ItemRef)]))(args).pipe(
+        Effect.orDie,
+        Effect.flatMap(([items]) =>
+          Ref.update(state, (current) => ({
+            ...current,
+            queued: [...current.queued, ...items.map(({ uri }, offset) => ({ uri, uid: `queue-${current.uids + offset}` }))],
+            uids: current.uids + items.length
+          }))
+        )
+      )
+
+    // Like Spotify: an item with a uid matches only that entry, one
+    // without matches every upcoming entry with the same uri, including
+    // the album's own.
+    const removeFromQueue = (args: ReadonlyArray<Schema.Json>) =>
+      decodeArgs(Schema.Tuple([Schema.Array(ItemRef)]))(args).pipe(
+        Effect.orDie,
+        Effect.flatMap(([items]) =>
+          Ref.update(state, (current) => ({
+            ...current,
+            queued: current.queued.filter((entry) =>
+              !items.some((item) => item.uid ? item.uid === entry.uid : item.uri === entry.uri)
+            ),
+            removedFromContext: [
+              ...current.removedFromContext,
+              ...items.flatMap((item) => item.uid ? [] : [item.uri])
+            ]
+          }))
+        )
+      )
+
     const handlers = new Map<string, (args: ReadonlyArray<Schema.Json>) => Effect.Effect<unknown>>([
       ["PlayerAPI.getState", () => getState],
       ["PlayerAPI.play", play],
@@ -118,6 +193,10 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
       ["PlayerAPI.seekTo", withNumber((positionMs) => (current) => ({ ...current, positionMs }))],
       ["PlayerAPI.setShuffle", setShuffle],
       ["PlayerAPI.setRepeat", withNumber((repeat) => (current) => ({ ...current, repeat }))],
+      ["PlayerAPI.getQueue", () => getQueue],
+      ["PlayerAPI.addToQueue", addToQueue],
+      ["PlayerAPI.removeFromQueue", removeFromQueue],
+      ["PlayerAPI.clearQueue", () => Ref.update(state, (current) => ({ ...current, queued: [] }))],
       ["PlaybackAPI.getVolume", () => Ref.get(level)],
       ["PlaybackAPI.setVolume", setVolume]
     ])

@@ -63,4 +63,24 @@ export class InternalApiChanged extends Schema.TaggedError<
   }
 }
 
-export type SpotifyError = BridgeError | InternalApiChanged
+
+export class NotFound extends Schema.TaggedError<
+  NotFound,
+  { readonly brand: unique symbol }
+>()("NotFound", {
+  what: Schema.String,
+  hint: Schema.String
+}) {
+  readonly [Runtime.errorExitCode] = 5
+  readonly [Runtime.errorReported] = false
+
+  get message() {
+    return `${this.what} wasn't found`
+  }
+
+  get detail() {
+    return "spotr looked it up in Spotify and got no match"
+  }
+}
+
+export type SpotifyError = BridgeError | InternalApiChanged | NotFound

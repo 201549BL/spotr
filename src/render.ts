@@ -1,6 +1,8 @@
 import { Console, Effect } from "effect"
 import type { SpotifyError } from "./domain/errors.ts"
 import type { PlayerStatus } from "./domain/PlayerStatus.ts"
+import type { Queue } from "./domain/Queue.ts"
+import type { Track } from "./domain/Track.ts"
 import { formatTime } from "./domain/Seek.ts"
 import type { Volume } from "./domain/Volume.ts"
 import { Json } from "./settings.ts"
@@ -37,8 +39,25 @@ export const statusText = (status: PlayerStatus) => {
     ...(status.liked ? ["♥ liked"] : [])
   ]
 
-  return `${paused ? "⏸" : "▶"} ${track.name} · ${track.artists.join(", ")}\n  ${details.join(" · ")}`
+  return `${paused ? "⏸" : "▶"} ${trackLine(track)}\n  ${details.join(" · ")}`
 }
+
+const trackLine = (track: Track) => `${track.name} · ${track.artists.join(", ")}`
+
+const numbered = (tracks: ReadonlyArray<Track>, limit: number) => {
+  const lines = tracks.slice(0, limit).map((track, index) => `  ${index + 1}. ${trackLine(track)}`)
+  const rest = tracks.length - limit
+
+  return rest > 0 ? [...lines, `  … and ${rest} more`] : lines
+}
+
+export const queueText = ({ current, queued, nextUp }: Queue) =>
+  [
+    current ? `Now playing: ${trackLine(current)}` : "Nothing playing",
+    queued.length > 0 ? "Queued:" : "Queued: nothing",
+    ...numbered(queued, 20),
+    ...(nextUp.length > 0 ? ["Next up:", ...numbered(nextUp, 10)] : [])
+  ].join("\n")
 
 export const shuffleText = ({ shuffle }: PlayerStatus) => `Shuffle ${shuffle ? "on" : "off"}`
 
