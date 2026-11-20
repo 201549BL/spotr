@@ -41,7 +41,8 @@ While the port is open, other programs on this computer can control Spotify too.
 | Command | What it does |
 | --- | --- |
 | `spotr status` | Show the track, position, shuffle, repeat and liked state |
-| `spotr play [uri]` | Play a track, album, playlist or artist. `spotr play liked` plays Liked Songs. No argument resumes |
+| `spotr search <words> [--limit n]` | Search Spotify. Lists tracks, artists, albums, playlists, podcasts and more, best match first |
+| `spotr play [what]` | Play a URI, an open.spotify.com link, or the best match for some words (`spotr play around the world daft punk`). `spotr play liked` plays Liked Songs. No argument resumes |
 | `spotr pause` / `spotr resume` | Pause or resume |
 | `spotr toggle` | Pause if playing, resume if paused |
 | `spotr next` / `spotr previous` | Skip forward or back. `previous` restarts the track when it's a few seconds in |
@@ -66,6 +67,8 @@ While the port is open, other programs on this computer can control Spotify too.
 | `spotr doctor` | Check that spotr can reach and drive Spotify |
 
 A deleted playlist can be recovered for a while at spotify.com/account/recover-playlists.
+
+`play` with words only plays a hit that shares a word with what you typed, since Spotify's search returns something even for gibberish. Use `spotr search` to see every hit.
 
 Wherever a command takes a URI, you can also paste an `open.spotify.com` link. Liked Songs (`spotify:collection:tracks`) and local files (`spotify:local:…`) work too.
 

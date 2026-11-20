@@ -1,6 +1,7 @@
 import { Clock, Context, Effect, Layer, Schedule, type Schema, Stream } from "effect"
 import { Bridge } from "../bridge/Bridge.ts"
 import { Check } from "../domain/Check.ts"
+import { playable, relevant, type SearchResult } from "../domain/SearchResult.ts"
 import type { Device } from "../domain/Device.ts"
 import { NeedsConfirmation, NotFound, type SpotifyError, SpotifyRefused } from "../domain/errors.ts"
 import type { PlayerStatus, Repeat } from "../domain/PlayerStatus.ts"
@@ -25,11 +26,13 @@ import {
   decodeMuted,
   decodeQueue,
   decodeRootlist,
+  decodeSearch,
   decodeState,
   decodeVolume,
   repeatModes,
   toDevices,
   toPlaylists,
+  toSearchResults,
   toStatus,
   toTrack
 } from "./raw.ts"
@@ -62,6 +65,9 @@ const uses = {
 } as const
 
 type Api = keyof typeof uses
+
+// Spotify's GraphQL queries spotr runs. doctor checks each is defined.
+const queries = ["searchModalResults"] as const
 
 // How one API looked to doctor.
 type Inspection =
@@ -102,6 +108,9 @@ export class Spotify extends Context.Service<Spotify, {
   readonly unmute: Effect.Effect<VolumeStatus, SpotifyError>
   // Emits the status now, then again whenever the track or play state
   // changes. It checks once a second.
+  readonly search: (text: string, limit: number) => Effect.Effect<ReadonlyArray<SearchResult>, SpotifyError>
+  // Plays the first playable search hit for `text`.
+  readonly playSearch: (text: string) => Effect.Effect<PlayerStatus, SpotifyError>
   readonly watch: Stream.Stream<PlayerStatus, SpotifyError>
   readonly doctor: Effect.Effect<ReadonlyArray<Check>>
 }>()("spotr/Spotify") {
@@ -441,6 +450,30 @@ export class Spotify extends Context.Service<Spotify, {
         Effect.andThen(pollUntil(volume, (now) => !now.muted))
       )
 
+      // The query behind Spotify's quick-search box. It returns a mix of
+      // tracks, artists, albums, playlists and more, best match first.
+      const search = (text: string, limit: number) =>
+        Effect.gen(function* () {
+          const body = yield* bridge.graphql("searchModalResults", {
+            searchTerm: text,
+            limit,
+            numberOfTopResults: limit,
+            offset: 0,
+            includeAuthors: false
+          }).pipe(Effect.flatMap(decodeSearch))
+
+          return yield* toSearchResults(body)
+        }).pipe(blameUpdate("GraphQL searchModalResults"))
+
+      const playSearch = (text: string) =>
+        Effect.gen(function* () {
+          const [best] = (yield* search(text, 10)).filter((hit) => playable(hit) && relevant(text)(hit))
+
+          if (!best) return yield* new NotFound({ what: `Anything playable for "${text}"`, hint: "Try other words, or spotr search to see what matches." })
+
+          return yield* play(best.uri)
+        })
+
       const watch = Stream.fromEffectSchedule(status, Schedule.spaced("1 second")).pipe(Stream.changesWith(sameMoment))
 
       const inspect = (api: Api) =>
@@ -470,13 +503,18 @@ export class Spotify extends Context.Service<Spotify, {
         const step = (name: string, ok: boolean, ready: boolean, detail: string) =>
           new Check({ name, status: !ready ? "skipped" : ok ? "pass" : "fail", detail: ready && !ok ? detail : "" })
 
+        const missingQueries = yield* bridge.inspectQueries(queries).pipe(
+          Effect.catch((error) => Effect.succeed([`could not check: ${error.message}`]))
+        )
+
         return [
           step("Spotify answers on the DevTools port", portOk, true, "Run spotr launch, or start Spotify with --remote-debugging-port."),
           step("Spotify's window is open", pageOk, portOk, "Spotify may still be starting."),
           step("spotr's agent reaches Spotify's internals", agentOk, pageOk, "Spotify didn't answer, or its internals have moved."),
           ...inspections.map(({ api, result }) =>
             step(`${api} has the ${uses[api].length === 1 ? "method" : `${uses[api].length} methods`} spotr uses`, result.kind === "ok", agentOk, "detail" in result ? result.detail : "")
-          )
+          ),
+          step("Spotify's search query is defined", missingQueries.length === 0, agentOk, `missing ${missingQueries.join(", ")}`)
         ]
       })
 
@@ -507,6 +545,8 @@ export class Spotify extends Context.Service<Spotify, {
         setVolume,
         mute,
         unmute,
+        search,
+        playSearch,
         watch,
         doctor
       }

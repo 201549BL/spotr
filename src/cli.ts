@@ -5,9 +5,10 @@ import { Socket } from "effect/socket"
 import { CdpBridge } from "./bridge/CdpBridge.ts"
 import { ChecksFailed } from "./domain/errors.ts"
 import { parseSeek } from "./domain/Seek.ts"
-import { SpotifyUri, toSpotifyUri } from "./domain/Track.ts"
+import { SpotifyUri, toPlayTarget, toSpotifyUri } from "./domain/Track.ts"
 import { parseVolumeChange } from "./domain/Volume.ts"
 import {
+  searchText,
   createdText,
   deletedText,
   devicesText,
@@ -42,12 +43,39 @@ const status = Command.make("status", {}, () =>
 
 const play = Command.make(
   "play",
-  { uri: uriArgument("A spotify: URI, an open.spotify.com link, or \"liked\" for Liked Songs").pipe(Argument.optional) },
-  ({ uri }) =>
-    Spotify.use((spotify) =>
-      Option.match(uri, { onNone: () => spotify.resume, onSome: spotify.play })
-    ).pipe(present(statusText))
-).pipe(Command.withDescription("Play a track, album, playlist or artist, or resume"))
+  {
+    what: Argument.String("what").pipe(
+      Argument.withDescription("A spotify: URI, an open.spotify.com link, \"liked\", or words to search for"),
+      Argument.variadic()
+    )
+  },
+  ({ what }) =>
+    Spotify.use((spotify) => {
+      const target = toPlayTarget(what)
+
+      switch (target.kind) {
+        case "resume":
+          return spotify.resume
+        case "uri":
+          return spotify.play(target.uri)
+        case "search":
+          return spotify.playSearch(target.text)
+      }
+    }).pipe(present(statusText))
+).pipe(Command.withDescription("Play something by URI, link or search, or resume"))
+
+const search = Command.make(
+  "search",
+  {
+    words: Argument.String("words").pipe(Argument.withDescription("What to search for"), Argument.variadic({ min: 1 })),
+    limit: Flag.Int("limit").pipe(
+      Flag.withDescription("How many results, from 1 to 30"),
+      Flag.withSchema(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 30 }))),
+      Flag.withDefault(10)
+    )
+  },
+  ({ words, limit }) => Spotify.use((spotify) => spotify.search(words.join(" "), limit)).pipe(present(searchText))
+).pipe(Command.withDescription("Search Spotify, best match first"))
 
 const pause = Command.make("pause", {}, () =>
   Spotify.use((spotify) => spotify.pause).pipe(present(statusText))
@@ -238,6 +266,7 @@ const toggle = Command.make("toggle", {}, () =>
 export const spotr = Command.make("spotr").pipe(
   Command.withSubcommands([
     status,
+    search,
     play,
     pause,
     resume,

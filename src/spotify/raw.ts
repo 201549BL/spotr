@@ -1,7 +1,8 @@
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 import { Device } from "../domain/Device.ts"
 import { InternalApiChanged, type SpotifyError } from "../domain/errors.ts"
 import { Playlist } from "../domain/Playlist.ts"
+import { SearchResult } from "../domain/SearchResult.ts"
 import { PlayerStatus, type Repeat } from "../domain/PlayerStatus.ts"
 import { SpotifyUri, Track } from "../domain/Track.ts"
 import { Volume } from "../domain/Volume.ts"
@@ -163,3 +164,79 @@ export const decodeDevices = Schema.decodeUnknownEffect(RawDevices)
 
 export const toDevices = (raw: typeof RawDevices.Type) =>
   raw.map(({ id, name, type, isActive, isLocal }) => new Device({ id, name, type, active: isActive, local: isLocal }))
+
+const Named = Schema.Struct({ name: Schema.String })
+
+const Profiles = Schema.Struct({ items: Schema.Array(Schema.Struct({ profile: Named })) })
+
+const OwnedBy = Schema.Struct({ data: Named })
+
+// The search hits spotr knows, by Spotify's __typename. Spotify's own
+// search box skips types it doesn't know, and spotr does the same.
+const RawHit = Schema.Union([
+  Schema.Struct({ __typename: Schema.Literal("Track"), uri: SpotifyUri, name: Schema.String, artists: Profiles }),
+  Schema.Struct({ __typename: Schema.Literal("Album"), uri: SpotifyUri, name: Schema.String, artists: Profiles }),
+  Schema.Struct({ __typename: Schema.Literal("Artist"), uri: SpotifyUri, profile: Named }),
+  Schema.Struct({ __typename: Schema.Literal("Playlist"), uri: SpotifyUri, name: Schema.String, ownerV2: OwnedBy }),
+  Schema.Struct({ __typename: Schema.Literal("Podcast"), uri: SpotifyUri, name: Schema.String, publisher: Named }),
+  Schema.Struct({ __typename: Schema.Literal("Audiobook"), uri: SpotifyUri, name: Schema.String, publisher: Named }),
+  Schema.Struct({ __typename: Schema.Literal("Episode"), uri: SpotifyUri, name: Schema.String, podcastV2: OwnedBy }),
+  Schema.Struct({ __typename: Schema.Literal("User"), uri: SpotifyUri, name: Schema.String }),
+  Schema.Struct({ __typename: Schema.Literal("Genre"), uri: SpotifyUri, name: Schema.String })
+])
+
+const knownHits = new Set(["Track", "Album", "Artist", "Playlist", "Podcast", "Audiobook", "Episode", "User", "Genre"])
+
+// The searchModalResults response. Each hit's data stays raw here,
+// because a Struct would drop every key it doesn't list.
+const RawSearch = Schema.Struct({
+  data: Schema.Struct({
+    searchV2: Schema.Struct({
+      topResultsV2: Schema.Struct({
+        itemsV2: Schema.Array(Schema.Struct({ item: Schema.Struct({ data: Schema.optional(Schema.Unknown) }) }))
+      })
+    })
+  })
+})
+
+export const decodeSearch = Schema.decodeUnknownEffect(RawSearch)
+
+const decodeTypename = Schema.decodeUnknownOption(Schema.Struct({ __typename: Schema.String }))
+
+const decodeHit = Schema.decodeUnknownEffect(RawHit)
+
+// Hits of a type spotr knows are decoded fully, so a reshaped Track is
+// an error rather than a silently missing result. Other types are
+// skipped, as Spotify's own search box does.
+export const toSearchResults = (search: typeof RawSearch.Type) =>
+  Effect.forEach(
+    search.data.searchV2.topResultsV2.itemsV2.filter(({ item }) =>
+      Option.exists(decodeTypename(item.data), ({ __typename }) => knownHits.has(__typename))
+    ),
+    ({ item }) => decodeHit(item.data).pipe(Effect.map(toSearchResult))
+  )
+
+const names = (artists: typeof Profiles.Type) => artists.items.map((artist) => artist.profile.name).join(", ")
+
+const toSearchResult = (hit: typeof RawHit.Type) => {
+  switch (hit.__typename) {
+        case "Track":
+          return new SearchResult({ kind: "track", uri: hit.uri, name: hit.name, by: names(hit.artists) })
+        case "Album":
+          return new SearchResult({ kind: "album", uri: hit.uri, name: hit.name, by: names(hit.artists) })
+        case "Artist":
+          return new SearchResult({ kind: "artist", uri: hit.uri, name: hit.profile.name, by: null })
+        case "Playlist":
+          return new SearchResult({ kind: "playlist", uri: hit.uri, name: hit.name, by: hit.ownerV2.data.name })
+        case "Podcast":
+          return new SearchResult({ kind: "podcast", uri: hit.uri, name: hit.name, by: hit.publisher.name })
+        case "Audiobook":
+          return new SearchResult({ kind: "audiobook", uri: hit.uri, name: hit.name, by: hit.publisher.name })
+        case "Episode":
+          return new SearchResult({ kind: "episode", uri: hit.uri, name: hit.name, by: hit.podcastV2.data.name })
+        case "User":
+          return new SearchResult({ kind: "user", uri: hit.uri, name: hit.name, by: null })
+        case "Genre":
+          return new SearchResult({ kind: "genre", uri: hit.uri, name: hit.name, by: null })
+  }
+}

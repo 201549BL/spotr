@@ -11,6 +11,7 @@ import type {
   PlaylistAddResult
 } from "./domain/Playlist.ts"
 import type { Queue } from "./domain/Queue.ts"
+import type { SearchResult } from "./domain/SearchResult.ts"
 import type { Track } from "./domain/Track.ts"
 import { formatTime } from "./domain/Seek.ts"
 import type { VolumeStatus } from "./domain/Volume.ts"
@@ -126,6 +127,17 @@ export const doctorText = (checks: ReadonlyArray<Check>) =>
 
 export const launchText = ({ started, port }: { readonly started: boolean; readonly port: number }) =>
   started ? `Started Spotify with DevTools on port ${port}` : `Spotify is already reachable on port ${port}`
+
+export const searchText = (results: ReadonlyArray<SearchResult>) =>
+  results.length === 0
+    ? "No results"
+    : results
+      .map((result, index) => {
+        const by = result.by ? ` · ${result.by}` : ""
+
+        return `${String(index + 1).padStart(2)}. ${result.kind.padEnd(9)} ${result.name}${by}\n    ${result.uri}`
+      })
+      .join("\n")
 
 export const shuffleText = ({ shuffle }: PlayerStatus) => `Shuffle ${shuffle ? "on" : "off"}`
 

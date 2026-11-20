@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 
 // "spotify:" and a kind, then colon-separated parts ending in a non-empty
 // one. Most are "spotify:track:<id>", but Liked Songs is
@@ -28,3 +28,23 @@ export class Track extends Schema.Class<Track, { readonly brand: unique symbol }
   artists: Schema.Array(Schema.String),
   durationMs: Schema.Int
 }) {}
+
+// What `spotr play` was asked to play: nothing (resume), a URI or link,
+// or words to search for.
+export type PlayTarget =
+  | { readonly kind: "resume" }
+  | { readonly kind: "uri"; readonly uri: SpotifyUri }
+  | { readonly kind: "search"; readonly text: string }
+
+const decodeUri = Schema.decodeUnknownOption(SpotifyUri)
+
+export const toPlayTarget = (words: ReadonlyArray<string>): PlayTarget => {
+  const text = words.join(" ").trim()
+
+  if (text === "") return { kind: "resume" }
+
+  return Option.match(decodeUri(toSpotifyUri(text)), {
+    onNone: (): PlayTarget => ({ kind: "search", text }),
+    onSome: (uri): PlayTarget => ({ kind: "uri", uri })
+  })
+}

@@ -16,4 +16,13 @@ export class Bridge extends Context.Service<Bridge, {
     api: string,
     methods: ReadonlyArray<string>
   ) => Effect.Effect<ReadonlyArray<string>, BridgeError | InternalApiChanged>
+  // Runs one of Spotify's GraphQL queries by name, e.g. searchModalResults.
+  readonly graphql: (
+    name: string,
+    variables: { readonly [key: string]: Schema.Json }
+  ) => Effect.Effect<unknown, BridgeError | InternalApiChanged>
+  // Returns which of `names` Spotify's code doesn't define as queries.
+  readonly inspectQueries: (
+    names: ReadonlyArray<string>
+  ) => Effect.Effect<ReadonlyArray<string>, BridgeError | InternalApiChanged>
 }>()("spotr/Bridge") {}

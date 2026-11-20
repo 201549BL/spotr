@@ -92,6 +92,47 @@ export const sampleDevices = [
   { id: "speaker-3", name: "Twin Speaker", type: "speaker", isLocal: false }
 ]
 
+const profiles = (...names: ReadonlyArray<string>) => ({ items: names.map((name) => ({ profile: { name } })) })
+
+// What the fake's search can find, in Spotify's searchModalResults shape,
+// including a hit of a type spotr doesn't know.
+const searchable = [
+  { __typename: "Track", uri: sampleQueue[0]?.uri, name: "First Song", artists: profiles("Some Artist"), albumOfTrack: {} },
+  { __typename: "Album", uri: sampleContext, name: "Sample Album", artists: profiles("Some Artist"), type: "ALBUM" },
+  { __typename: "Artist", uri: "spotify:artist:4444444444444444444444", profile: { name: "Some Artist" } },
+  {
+    __typename: "Playlist",
+    uri: "spotify:playlist:1111111111111111111111",
+    name: "Road Trip Songs",
+    description: "",
+    ownerV2: { data: { __typename: "User", name: "Someone" } }
+  },
+  { __typename: "Genre", uri: "spotify:genre:5555555555555555555555", name: "Song Genre" },
+  { __typename: "SomethingNew", uri: "spotify:new:6666666666666666666666", name: "Song From The Future" }
+]
+
+// Like Spotify, the fake always returns something, even for gibberish.
+const filler = {
+  __typename: "Playlist",
+  uri: "spotify:playlist:7777777777777777777777",
+  name: "Popular Right Now",
+  description: "",
+  ownerV2: { data: { __typename: "User", name: "Spotify" } }
+}
+
+const searchBody = (term: string, limit: number) => ({
+  data: {
+    searchV2: {
+      topResultsV2: {
+        itemsV2: [...searchable.filter((hit) => JSON.stringify(hit).toLowerCase().includes(term.toLowerCase())), filler]
+          .slice(0, limit)
+          .map((data) => ({ item: { __typename: `${data.__typename}ResponseWrapper`, data } }))
+      }
+    }
+  },
+  extensions: {}
+})
+
 type QueueEntry = { readonly uri: string; readonly uid: string }
 
 type PlayerState = {
@@ -440,7 +481,17 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
         return handler ? handler(args) : Effect.die(`FakeBridge has no ${api}.${method}`)
       },
       inspect: (api: string, methods: ReadonlyArray<string>) =>
-        Effect.succeed(methods.filter((method) => !handlers.has(`${api}.${method}`)))
+        Effect.succeed(methods.filter((method) => !handlers.has(`${api}.${method}`))),
+      graphql: (name: string, variables: { readonly [key: string]: Schema.Json }) =>
+        name === "searchModalResults"
+          // Like Spotify, numberOfTopResults sets the count; limit doesn't.
+          ? decodeArgs(Schema.Struct({ searchTerm: Schema.String, numberOfTopResults: Schema.Int }))(variables).pipe(
+            Effect.orDie,
+            Effect.map(({ searchTerm, numberOfTopResults }) => searchBody(searchTerm, numberOfTopResults))
+          )
+          : Effect.die(`FakeBridge has no query ${name}`),
+      inspectQueries: (names: ReadonlyArray<string>) =>
+        Effect.succeed(names.filter((name) => name !== "searchModalResults"))
     }
   })
 )

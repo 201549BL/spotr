@@ -20,7 +20,7 @@ Run from `cli/`.
 - `src/render.ts` turns command results and errors into text or JSON.
 - `src/settings.ts` defines the global `--json` and `--port` settings.
 - `src/domain/` holds the Schema models, tagged errors, and pure helpers such as seek parsing.
-- `src/spotify/Spotify.ts` is the service commands use. Its `uses` table lists every internal method spotr calls. `call` is typed against it, and `doctor` checks it.
+- `src/spotify/Spotify.ts` is the service commands use. Its `uses` table lists every internal method spotr calls, and `queries` every GraphQL query. `call` is typed against `uses`, and `doctor` checks both.
 - `src/spotify/raw.ts` holds the shapes Spotify's internal APIs return, and turns them into domain types.
 - `src/spotify/Launcher.ts` starts the Spotify app with the DevTools port open, through `effect/process`.
 - `src/bridge/` is the seam to Spotify. `Bridge.ts` is the interface, `CdpBridge.ts` and `Cdp.ts` reach the real app, and `FakeBridge.ts` stands in for it in tests.
@@ -35,6 +35,7 @@ Run from `cli/`.
 - Each error class carries its own exit code as `[Runtime.errorExitCode]`, with `[Runtime.errorReported] = false` so the runtime does not log it again. The codes are listed in `README.md`.
 - `Flag.Boolean` needs `Flag.withDefault(false)`, or the flag becomes required.
 - `src/page/` never imports Effect. Bump the agent's `version` whenever `agent.ts` changes, or Spotify keeps running the old copy.
+- GraphQL queries are run by name. The agent reads each query's hash from Spotify's code, because the hash changes when Spotify changes the query. Never hardcode one.
 - Commands depend on `Spotify` (and `Launcher`), never on `Bridge` directly.
 - Decode everything Spotify returns with Schema in `raw.ts`, and turn decode failures into `InternalApiChanged` with `blameUpdate`.
 - After a command, Spotify reports the old state for a moment. Wait for the change with `settle` or `pollUntil` in `Spotify.ts`.

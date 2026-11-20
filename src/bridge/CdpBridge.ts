@@ -16,7 +16,7 @@ const Targets = Schema.Array(Schema.Struct({
 
 const Failure = Schema.Struct({
   ok: Schema.Literal(false),
-  kind: Schema.Literals(["NotReady", "ApiMissing", "MethodMissing", "Rejected"]),
+  kind: Schema.Literals(["NotReady", "ApiMissing", "MethodMissing", "QueryMissing", "Rejected"]),
   message: Schema.String
 })
 
@@ -91,6 +91,27 @@ export const CdpBridge = Layer.effect(
         return yield* new InternalApiChanged({ operation: api, issue: `${result.kind}: ${result.message}` })
       })
 
-    return { call, inspect }
+    const graphql = (name: string, variables: { readonly [key: string]: Schema.Json }) =>
+      Effect.gen(function* () {
+        const operation = `GraphQL ${name}`
+        const raw = yield* runAgent(operation, `.graphql(${params(name, variables)})`)
+        const result = yield* decodeDispatch(raw).pipe(Effect.orDie)
+
+        if (result.ok) return result.value
+
+        return yield* new InternalApiChanged({ operation, issue: `${result.kind}: ${result.message}` })
+      })
+
+    const inspectQueries = (names: ReadonlyArray<string>) =>
+      Effect.gen(function* () {
+        const raw = yield* runAgent("GraphQL queries", `.inspectQueries(${params(names)})`)
+        const result = yield* decodeInspect(raw).pipe(Effect.orDie)
+
+        if (result.ok) return result.value
+
+        return yield* new InternalApiChanged({ operation: "GraphQL queries", issue: `${result.kind}: ${result.message}` })
+      })
+
+    return { call, inspect, graphql, inspectQueries }
   })
 )

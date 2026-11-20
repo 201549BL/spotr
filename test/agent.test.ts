@@ -35,10 +35,25 @@ const player = {
   getHelper: () => ({ double: (value: number) => value * 2 })
 }
 
-const registry = {
-  _map: new Map([[Symbol("PlayerAPI"), {}], [Symbol("EmptyAPI"), {}]]),
-  resolve: (token: symbol) => token.description === "PlayerAPI" ? player : {}
+type QueryDefinition = { readonly name: string; readonly operation: string; readonly sha256Hash: string; readonly value: null }
+
+const ranQueries: Array<{ readonly definition: QueryDefinition; readonly variables: { readonly term: string } }> = []
+
+// Spotify's GraphQL loader is itself a function, not an object of methods.
+const graphQLLoader = async (definition: QueryDefinition, variables: { readonly term: string }) => {
+  ranQueries.push({ definition, variables })
+
+  return { data: { echo: variables.term } }
 }
+
+const apis = new Map<string, object>([["PlayerAPI", player], ["EmptyAPI", {}], ["GraphQLLoader", graphQLLoader]])
+
+const registry = {
+  _map: new Map([...apis.keys()].map((name) => [Symbol(name), {}])),
+  resolve: (token: symbol) => apis.get(token.description ?? "") ?? {}
+}
+
+const queryHash = "a".repeat(64)
 
 // What a React context value may hold: the platform itself, or a bag
 // with the platform one level down.
@@ -55,13 +70,16 @@ const fakePage = (value: ContextValue | undefined) => {
   const root = { "__reactContainer$sample": fiberTree(value) }
 
   Object.assign(globalThis, {
-    window: {},
+    window: {
+      __webpack_modules__: { 1: `function(e,t,i){let q=new i.l("sampleSearch","query","${queryHash}",null)}` }
+    },
     document: { querySelector: (selector: string) => selector === "#main" ? root : null, body: { firstElementChild: null } }
   })
 }
 
 beforeEach(() => {
   received.length = 0
+  ranQueries.length = 0
   fakePage({ platform: { getRegistry: () => registry } })
 })
 
@@ -91,6 +109,22 @@ describe("page agent", () => {
       ok: true,
       value: ["getNothing.double"]
     })
+  })
+
+  it("runs a GraphQL query with the hash Spotify's code defines for it", async () => {
+    const agent = install()
+    const result = JSON.parse(JSON.stringify(await agent.graphql("sampleSearch", { term: "jazz" })))
+
+    assert.deepStrictEqual(result, { ok: true, value: { data: { echo: "jazz" } } })
+    assert.deepStrictEqual(ranQueries, [
+      { definition: { name: "sampleSearch", operation: "query", sha256Hash: queryHash, value: null }, variables: { term: "jazz" } }
+    ])
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(await agent.graphql("noSuchQuery", {}))), {
+      ok: false,
+      kind: "QueryMissing",
+      message: "Spotify's code defines no query named noSuchQuery"
+    })
+    assert.deepStrictEqual(agent.inspectQueries(["sampleSearch", "noSuchQuery"]), { ok: true, value: ["noSuchQuery"] })
   })
 
   it("returns plain objects rather than Spotify's class instances", async () => {

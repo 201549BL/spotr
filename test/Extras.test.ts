@@ -43,7 +43,9 @@ describe("watch", () => {
 const inspectingBridge = (fail: (api: string) => Effect.Effect<ReadonlyArray<string>, ClientNotRunning | InternalApiChanged>) =>
   Layer.succeed(Bridge, {
     call: () => Effect.die("doctor never calls methods"),
-    inspect: (api) => fail(api)
+    inspect: (api) => fail(api),
+    graphql: () => Effect.die("doctor never runs queries"),
+    inspectQueries: () => Effect.succeed([])
   })
 
 const doctorWith = (bridge: Layer.Layer<Bridge>) =>
@@ -67,7 +69,8 @@ describe("doctor", () => {
         "pass RootlistAPI has the 6 methods spotr uses",
         "pass PlaylistAPI has the method spotr uses",
         "pass ConnectDevicesAPI has the method spotr uses",
-        "pass ConnectTransferAPI has the method spotr uses"
+        "pass ConnectTransferAPI has the method spotr uses",
+        "pass Spotify's search query is defined"
       ])
     }))
 
@@ -143,7 +146,9 @@ const startsAfterOpen = (ran: Ref.Ref<ReadonlyArray<string>>) =>
           opened.pipe(
             Effect.flatMap((up) => up ? inner.call(api, method, ...args) : Effect.fail(new ClientNotRunning({ port: 9222, reason: "port" })))
           ),
-        inspect: inner.inspect
+        inspect: inner.inspect,
+        graphql: inner.graphql,
+        inspectQueries: inner.inspectQueries
       }
     })
   ).pipe(Layer.provide(FakeBridge(sampleQueue, 0)))
@@ -185,7 +190,9 @@ describe("launch", () => {
 
       const notRunning = Layer.succeed(Bridge, {
         call: () => Effect.fail(new ClientNotRunning({ port: 9222, reason: "port" })),
-        inspect: () => Effect.die("unused")
+        inspect: () => Effect.die("unused"),
+        graphql: () => Effect.die("unused"),
+        inspectQueries: () => Effect.die("unused")
       })
 
       const running = yield* Effect.flip(launchWith(ran, notRunning, () => 0))

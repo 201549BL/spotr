@@ -4,9 +4,10 @@ import { Check } from "../src/domain/Check.ts"
 import { Device } from "../src/domain/Device.ts"
 import { CreatedPlaylist, DeletedPlaylist, LikeResult, Playlist, PlaylistAddResult } from "../src/domain/Playlist.ts"
 import { Queue } from "../src/domain/Queue.ts"
+import { SearchResult } from "../src/domain/SearchResult.ts"
 import { SpotifyUri, Track } from "../src/domain/Track.ts"
 import { Volume, VolumeStatus } from "../src/domain/Volume.ts"
-import { volumeText, createdText, deletedText, devicesText, doctorText, launchText, likeText, watchText, playlistAddText, playlistsText, queueText, repeatText, shuffleText, statusText } from "../src/render.ts"
+import { searchText, volumeText, createdText, deletedText, devicesText, doctorText, launchText, likeText, watchText, playlistAddText, playlistsText, queueText, repeatText, shuffleText, statusText } from "../src/render.ts"
 
 const track = new Track({
   uri: SpotifyUri.make("spotify:track:1111111111111111111111"),
@@ -129,5 +130,18 @@ describe("extras text", () => {
     assert.strictEqual(launchText({ started: true, port: 9222 }), "Started Spotify with DevTools on port 9222")
     assert.strictEqual(launchText({ started: false, port: 9333 }), "Spotify is already reachable on port 9333")
     assert.strictEqual(watchText(playing), "▶ First Song · Some Artist, Guest")
+  })
+})
+
+describe("searchText", () => {
+  it("numbers the hits with their kind, maker and URI", () => {
+    assert.strictEqual(
+      searchText([
+        new SearchResult({ kind: "track", uri: SpotifyUri.make("spotify:track:1111111111111111111111"), name: "First Song", by: "Some Artist" }),
+        new SearchResult({ kind: "artist", uri: SpotifyUri.make("spotify:artist:4444444444444444444444"), name: "Some Artist", by: null })
+      ]),
+      " 1. track     First Song · Some Artist\n    spotify:track:1111111111111111111111\n 2. artist    Some Artist\n    spotify:artist:4444444444444444444444"
+    )
+    assert.strictEqual(searchText([]), "No results")
   })
 })

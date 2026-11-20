@@ -35,7 +35,7 @@ type Fiber = {
 
 type Failure = {
   readonly ok: false
-  readonly kind: "NotReady" | "ApiMissing" | "MethodMissing" | "Rejected"
+  readonly kind: "NotReady" | "ApiMissing" | "MethodMissing" | "QueryMissing" | "Rejected"
   readonly message: string
 }
 
@@ -48,16 +48,21 @@ export type Agent = {
   readonly version: number
   readonly dispatch: (api: string, method: string, args: ReadonlyArray<Json>) => Promise<DispatchResult>
   readonly inspect: (api: string, methods: ReadonlyArray<string>) => InspectResult
+  // Runs one of Spotify's own GraphQL queries, such as searchModalResults.
+  readonly graphql: (name: string, variables: { readonly [key: string]: Json }) => Promise<DispatchResult>
+  // The query names Spotify's code doesn't define. Nothing is run.
+  readonly inspectQueries: (names: ReadonlyArray<string>) => InspectResult
 }
 
 declare global {
   interface Window {
     __spotr?: Agent
+    __webpack_modules__?: Readonly<Record<string, { toString(): string }>>
   }
 }
 
 export const installAgent = (): Agent => {
-  const version = 5
+  const version = 6
 
   if (window.__spotr?.version === version) return window.__spotr
 
@@ -107,8 +112,40 @@ export const installAgent = (): Agent => {
     return token ? registry.resolve(token) : undefined
   }
 
+  // Spotify defines each GraphQL query in its code as
+  // `new X.l("searchModalResults","query","<sha256>",null)`. The hash
+  // changes when Spotify changes the query, so look it up each time the
+  // agent installs rather than hardcoding it.
+  const queryHashes = new Map<string, string>()
+
+  for (const mod of Object.values(window.__webpack_modules__ ?? {})) {
+    for (const match of mod.toString().matchAll(/"([A-Za-z]+)","query","([0-9a-f]{64})"/g)) {
+      if (match[1] && match[2]) queryHashes.set(match[1], match[2])
+    }
+  }
+
   const agent: Agent = {
     version,
+    inspectQueries(names) {
+      return { ok: true, value: names.filter((name) => !queryHashes.has(name)) }
+    },
+    async graphql(name, variables) {
+      if (!registry) return { ok: false, kind: "NotReady", message: "Spotify's internal registry wasn't found" }
+      const loader = resolveApi("GraphQLLoader")
+
+      if (!(loader instanceof Function)) return { ok: false, kind: "ApiMissing", message: "No internal API named GraphQLLoader" }
+      const sha256Hash = queryHashes.get(name)
+
+      if (!sha256Hash) return { ok: false, kind: "QueryMissing", message: `Spotify's code defines no query named ${name}` }
+
+      try {
+        const body = await loader({ name, operation: "query", sha256Hash, value: null }, variables)
+
+        return { ok: true, value: JSON.parse(JSON.stringify(body ?? null)) }
+      } catch (error) {
+        return { ok: false, kind: "Rejected", message: String(error) }
+      }
+    },
     inspect(api, methods) {
       if (!registry) return { ok: false, kind: "NotReady", message: "Spotify's internal registry wasn't found" }
       const target = resolveApi(api)
