@@ -1,8 +1,9 @@
 import { assert, describe, it } from "@effect/vitest"
 import { PlayerStatus } from "../src/domain/PlayerStatus.ts"
+import { LikeResult, Playlist, PlaylistAddResult } from "../src/domain/Playlist.ts"
 import { Queue } from "../src/domain/Queue.ts"
 import { SpotifyUri, Track } from "../src/domain/Track.ts"
-import { queueText, repeatText, shuffleText, statusText } from "../src/render.ts"
+import { likeText, playlistAddText, playlistsText, queueText, repeatText, shuffleText, statusText } from "../src/render.ts"
 
 const track = new Track({
   uri: SpotifyUri.make("spotify:track:1111111111111111111111"),
@@ -71,5 +72,21 @@ describe("queueText", () => {
         "  … and 2 more"
       ].join("\n")
     )
+  })
+})
+
+describe("library text", () => {
+  it("describes likes and playlist additions", () => {
+    const uri = SpotifyUri.make("spotify:track:1111111111111111111111")
+    const focus = new Playlist({ uri: SpotifyUri.make("spotify:playlist:2222222222222222222222"), name: "Focus", folder: "Work", canAdd: true, tracks: 1 })
+
+    assert.strictEqual(likeText(new LikeResult({ uri, name: "First Song", liked: true })), "♥ Liked First Song")
+    assert.strictEqual(likeText(new LikeResult({ uri, name: null, liked: false })), `Removed ${uri} from Liked Songs`)
+    assert.strictEqual(playlistAddText(new PlaylistAddResult({ playlist: focus, uri, name: null })), `Added ${uri} to Focus`)
+    assert.strictEqual(
+      playlistsText([focus, new Playlist({ ...focus, folder: null, name: "Mix", canAdd: false, tracks: 30 })]),
+      "Work / Focus · 1 track\nMix · 30 tracks · read-only"
+    )
+    assert.strictEqual(playlistsText([]), "No playlists")
   })
 })

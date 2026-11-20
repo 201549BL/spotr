@@ -33,6 +33,49 @@ export const sampleExtra: RawTrack = {
   duration: { milliseconds: 150_000 }
 }
 
+type SamplePlaylist = {
+  readonly type: "playlist"
+  readonly uri: string
+  readonly name: string
+  readonly canAdd: boolean
+  readonly totalLength: number
+}
+
+type SampleFolder = {
+  readonly type: "folder"
+  readonly uri: string
+  readonly name: string
+  readonly items: ReadonlyArray<SampleFolder | SamplePlaylist | { readonly type: "placeholder"; readonly uri: string }>
+}
+
+const samplePlaylist = (id: number, name: string, canAdd: boolean, totalLength: number): SamplePlaylist => ({
+  type: "playlist",
+  uri: `spotify:playlist:${String(id).repeat(22)}`,
+  name,
+  canAdd,
+  totalLength
+})
+
+// The playlist sidebar: a folder, a playlist the user can't add to, two
+// playlists that share a name, and a playlist Spotify couldn't load.
+export const sampleRootlist: SampleFolder = {
+  type: "folder",
+  uri: "",
+  name: "",
+  items: [
+    samplePlaylist(1, "Road Trip", true, 2),
+    {
+      type: "folder",
+      uri: "spotify:user:someone:folder:0",
+      name: "Work",
+      items: [samplePlaylist(2, "Focus", true, 5), samplePlaylist(3, "Someone's Mix", false, 30)]
+    },
+    samplePlaylist(4, "Twins", true, 1),
+    samplePlaylist(5, "Twins", true, 1),
+    { type: "placeholder", uri: "spotify:playlist:9999999999999999999999" }
+  ]
+}
+
 type QueueEntry = { readonly uri: string; readonly uid: string }
 
 type PlayerState = {
@@ -44,6 +87,8 @@ type PlayerState = {
   readonly queued: ReadonlyArray<QueueEntry>
   readonly removedFromContext: ReadonlyArray<string>
   readonly uids: number
+  readonly liked: ReadonlyArray<string>
+  readonly playlistAdds: ReadonlyArray<string>
 }
 
 const ItemRef = Schema.Struct({ uri: Schema.String, uid: Schema.optional(Schema.String) })
@@ -65,7 +110,9 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
       repeat: 0,
       queued: [],
       removedFromContext: [],
-      uids: 0
+      uids: 0,
+      liked: [],
+      playlistAdds: []
     }
 
     const state = yield* Ref.make(initial)
@@ -81,7 +128,7 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
       const item = queue[current.index % queue.length]
 
       return {
-        item: item ? { ...item, metadata: { "collection.in_collection": "false" } } : null,
+        item: item ? { ...item, metadata: { "collection.in_collection": String(current.liked.includes(item.uri)) } } : null,
         context: item ? { uri: sampleContext } : null,
         isPaused: current.paused,
         shuffle: current.shuffle,
@@ -175,6 +222,52 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
         )
       )
 
+    const setLiked = (liked: boolean) => (args: ReadonlyArray<Schema.Json>) =>
+      decodeArgs(Schema.Tuple([Schema.Struct({ uris: Schema.Array(Schema.String) })]))(args).pipe(
+        Effect.orDie,
+        Effect.flatMap(([{ uris }]) =>
+          command((current) => ({
+            ...current,
+            liked: liked
+              ? [...current.liked, ...uris]
+              : current.liked.filter((uri) => !uris.includes(uri))
+          }))
+        )
+      )
+
+    // LibraryAPI.contains takes URIs as separate arguments.
+    const contains = (args: ReadonlyArray<Schema.Json>) =>
+      decodeArgs(Schema.Array(Schema.String))(args).pipe(
+        Effect.orDie,
+        Effect.flatMap((uris) => Ref.get(state).pipe(Effect.map((current) => uris.map((uri) => current.liked.includes(uri)))))
+      )
+
+    // Each add grows that playlist's track count, so tests can see it.
+    const rootlist = Ref.get(state).pipe(
+      Effect.map((current) => {
+        const grow = (folder: SampleFolder): SampleFolder => ({
+          ...folder,
+          items: folder.items.map((item) => {
+            if (item.type === "folder") return grow(item)
+
+            if (item.type === "placeholder") return item
+
+            return { ...item, totalLength: item.totalLength + current.playlistAdds.filter((uri) => uri === item.uri).length }
+          })
+        })
+
+        return grow(sampleRootlist)
+      })
+    )
+
+    const addToPlaylist = (args: ReadonlyArray<Schema.Json>) =>
+      decodeArgs(Schema.Tuple([Schema.String, Schema.Array(Schema.String), Schema.Struct({ after: Schema.Literal("end") }), Schema.Unknown]))(args).pipe(
+        Effect.orDie,
+        Effect.flatMap(([playlist, uris]) =>
+          Ref.update(state, (current) => ({ ...current, playlistAdds: [...current.playlistAdds, ...uris.map(() => playlist)] }))
+        )
+      )
+
     const handlers = new Map<string, (args: ReadonlyArray<Schema.Json>) => Effect.Effect<unknown>>([
       ["PlayerAPI.getState", () => getState],
       ["PlayerAPI.play", play],
@@ -197,6 +290,11 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
       ["PlayerAPI.addToQueue", addToQueue],
       ["PlayerAPI.removeFromQueue", removeFromQueue],
       ["PlayerAPI.clearQueue", () => Ref.update(state, (current) => ({ ...current, queued: [] }))],
+      ["LibraryAPI.add", setLiked(true)],
+      ["LibraryAPI.remove", setLiked(false)],
+      ["LibraryAPI.contains", contains],
+      ["RootlistAPI.getContents", () => rootlist],
+      ["PlaylistAPI.add", addToPlaylist],
       ["PlaybackAPI.getVolume", () => Ref.get(level)],
       ["PlaybackAPI.setVolume", setVolume]
     ])

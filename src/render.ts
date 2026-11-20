@@ -1,6 +1,7 @@
 import { Console, Effect } from "effect"
 import type { SpotifyError } from "./domain/errors.ts"
 import type { PlayerStatus } from "./domain/PlayerStatus.ts"
+import type { LikeResult, Playlist, PlaylistAddResult } from "./domain/Playlist.ts"
 import type { Queue } from "./domain/Queue.ts"
 import type { Track } from "./domain/Track.ts"
 import { formatTime } from "./domain/Seek.ts"
@@ -58,6 +59,24 @@ export const queueText = ({ current, queued, nextUp }: Queue) =>
     ...numbered(queued, 20),
     ...(nextUp.length > 0 ? ["Next up:", ...numbered(nextUp, 10)] : [])
   ].join("\n")
+
+export const likeText = ({ uri, name, liked }: LikeResult) =>
+  liked ? `♥ Liked ${name ?? uri}` : `Removed ${name ?? uri} from Liked Songs`
+
+export const playlistsText = (playlists: ReadonlyArray<Playlist>) =>
+  playlists.length === 0
+    ? "No playlists"
+    : playlists
+      .map((playlist) => {
+        const name = playlist.folder ? `${playlist.folder} / ${playlist.name}` : playlist.name
+        const tracks = `${playlist.tracks} track${playlist.tracks === 1 ? "" : "s"}`
+
+        return `${name} · ${tracks}${playlist.canAdd ? "" : " · read-only"}`
+      })
+      .join("\n")
+
+export const playlistAddText = ({ playlist, uri, name }: PlaylistAddResult) =>
+  `Added ${name ?? uri} to ${playlist.name}`
 
 export const shuffleText = ({ shuffle }: PlayerStatus) => `Shuffle ${shuffle ? "on" : "off"}`
 

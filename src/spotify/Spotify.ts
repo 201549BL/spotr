@@ -1,90 +1,25 @@
-import { Clock, Context, Effect, Layer, Schedule, Schema } from "effect"
+import { Clock, Context, Effect, Layer, Schedule, type Schema } from "effect"
 import { Bridge } from "../bridge/Bridge.ts"
-import { InternalApiChanged, NotFound, type SpotifyError } from "../domain/errors.ts"
-import { PlayerStatus, type Repeat } from "../domain/PlayerStatus.ts"
+import { NotFound, type SpotifyError } from "../domain/errors.ts"
+import type { PlayerStatus, Repeat } from "../domain/PlayerStatus.ts"
+import { LikeResult, type Playlist, PlaylistAddResult } from "../domain/Playlist.ts"
 import { Queue } from "../domain/Queue.ts"
 import type { SeekTarget } from "../domain/Seek.ts"
-import { type SpotifyUri, SpotifyUri as SpotifyUriSchema, Track } from "../domain/Track.ts"
-import { Volume } from "../domain/Volume.ts"
-
-// A track or episode as Spotify's player describes it. Episodes may have
-// no artists.
-const RawItem = Schema.Struct({
-  uri: SpotifyUriSchema,
-  uid: Schema.optional(Schema.String),
-  name: Schema.String,
-  artists: Schema.optional(Schema.Array(Schema.Struct({ name: Schema.String }))),
-  duration: Schema.Struct({ milliseconds: Schema.Finite }),
-  metadata: Schema.optional(Schema.Record(Schema.String, Schema.String))
-})
-
-const toTrack = (item: typeof RawItem.Type) =>
-  new Track({
-    uri: item.uri,
-    name: item.name,
-    artists: (item.artists ?? []).map((artist) => artist.name),
-    durationMs: Math.round(item.duration.milliseconds)
-  })
-
-// PlayerAPI.getQueue(): `queued` holds the user's additions, `nextUp`
-// the rest of the context.
-const RawQueue = Schema.Struct({
-  current: Schema.optional(Schema.NullOr(RawItem)),
-  queued: Schema.Array(RawItem),
-  nextUp: Schema.Array(RawItem)
-})
-
-const decodeQueue = Schema.decodeUnknownEffect(RawQueue)
-
-// The parts of PlayerAPI.getState() spotr uses. Spotify's own UI treats
-// `item` as possibly missing, and the whole state is null before the
-// player's first update.
-const RawState = Schema.NullOr(Schema.Struct({
-  item: Schema.optional(Schema.NullOr(RawItem)),
-  context: Schema.optional(Schema.NullOr(Schema.Struct({ uri: Schema.String }))),
-  isPaused: Schema.Boolean,
-  shuffle: Schema.Boolean,
-  repeat: Schema.Literals([0, 1, 2]),
-  positionAsOfTimestamp: Schema.Finite,
-  timestamp: Schema.Finite
-}))
-
-const decodeState = Schema.decodeUnknownEffect(RawState)
-
-const decodeLevel = Schema.decodeUnknownEffect(Schema.Finite)
-
-const decodeVolume = Schema.decodeUnknownEffect(Volume)
-
-const repeatModes: ReadonlyArray<Repeat> = ["off", "all", "one"]
-
-// When Spotify's data doesn't match a schema, Spotify has most likely
-// changed underneath us.
-const blameUpdate = (operation: string) =>
-  <A>(self: Effect.Effect<A, SpotifyError | Schema.SchemaError>): Effect.Effect<A, SpotifyError> =>
-    self.pipe(
-      Effect.catchTag("SchemaError", (error) =>
-        Effect.fail(new InternalApiChanged({ operation, issue: error.message }))
-      )
-    )
-
-// Spotify reports the position at a moment in time; while playing, the
-// real position has moved on since then.
-const toStatus = (raw: typeof RawState.Type, now: number) => {
-  const item = raw?.item ?? null
-  const track = item ? toTrack(item) : null
-  const moved = raw && !raw.isPaused ? now - raw.timestamp : 0
-  const position = Math.round((raw?.positionAsOfTimestamp ?? 0) + moved)
-
-  return new PlayerStatus({
-    track,
-    context: raw?.context?.uri ?? null,
-    paused: raw?.isPaused ?? true,
-    positionMs: Math.max(0, Math.min(position, track?.durationMs ?? 0)),
-    shuffle: raw?.shuffle ?? false,
-    repeat: repeatModes[raw?.repeat ?? 0] ?? "off",
-    liked: item?.metadata?.["collection.in_collection"] === "true"
-  })
-}
+import type { SpotifyUri } from "../domain/Track.ts"
+import type { Volume } from "../domain/Volume.ts"
+import {
+  blameUpdate,
+  decodeContains,
+  decodeLevel,
+  decodeQueue,
+  decodeRootlist,
+  decodeState,
+  decodeVolume,
+  repeatModes,
+  toPlaylists,
+  toStatus,
+  toTrack
+} from "./raw.ts"
 
 export class Spotify extends Context.Service<Spotify, {
   readonly status: Effect.Effect<PlayerStatus, SpotifyError>
@@ -100,6 +35,13 @@ export class Spotify extends Context.Service<Spotify, {
   readonly addToQueue: (uri: SpotifyUri) => Effect.Effect<Queue, SpotifyError>
   readonly removeFromQueue: (uri: SpotifyUri) => Effect.Effect<Queue, SpotifyError>
   readonly clearQueue: Effect.Effect<Queue, SpotifyError>
+  readonly like: (uri: SpotifyUri | undefined) => Effect.Effect<LikeResult, SpotifyError>
+  readonly unlike: (uri: SpotifyUri | undefined) => Effect.Effect<LikeResult, SpotifyError>
+  readonly playlists: Effect.Effect<ReadonlyArray<Playlist>, SpotifyError>
+  readonly addToPlaylist: (
+    playlist: string,
+    uri: SpotifyUri | undefined
+  ) => Effect.Effect<PlaylistAddResult, SpotifyError>
   readonly volume: Effect.Effect<Volume, SpotifyError>
   readonly setVolume: (level: Volume) => Effect.Effect<void, SpotifyError>
 }>()("spotr/Spotify") {
@@ -232,6 +174,81 @@ export class Spotify extends Context.Service<Spotify, {
         Effect.andThen(pollUntil(queue, (now) => now.queued.length === 0))
       )
 
+      // The given track, or the playing one when none is given.
+      const target = (uri: SpotifyUri | undefined) =>
+        Effect.gen(function* () {
+          if (uri) return { uri, name: null }
+          const { track } = yield* status
+
+          if (!track) {
+            return yield* new NotFound({ what: "A playing track", hint: "Play something, or pass a track URI." })
+          }
+
+          return { uri: track.uri, name: track.name }
+        })
+
+      const isLiked = (uri: SpotifyUri) =>
+        bridge.call("LibraryAPI", "contains", uri).pipe(
+          Effect.flatMap(decodeContains),
+          Effect.map(([liked]) => liked === true),
+          blameUpdate("LibraryAPI.contains")
+        )
+
+      const setLiked = (liked: boolean) => (uri: SpotifyUri | undefined) =>
+        Effect.gen(function* () {
+          const track = yield* target(uri)
+
+          yield* bridge.call("LibraryAPI", liked ? "add" : "remove", { uris: [track.uri] })
+
+          const now = yield* pollUntil(isLiked(track.uri), (value) => value === liked)
+
+          return new LikeResult({ ...track, liked: now })
+        })
+
+      const playlists = bridge.call("RootlistAPI", "getContents").pipe(
+        Effect.flatMap(decodeRootlist),
+        Effect.map((root) => toPlaylists(root)),
+        blameUpdate("RootlistAPI.getContents")
+      )
+
+      // `playlist` is a URI, or a name matched without regard to case
+      // among the playlists the user can add to.
+      const findPlaylist = (playlist: string) =>
+        Effect.gen(function* () {
+          const all = yield* playlists
+          const wanted = playlist.toLowerCase()
+
+          const matches = all.filter((candidate) =>
+            candidate.uri === playlist || (candidate.canAdd && candidate.name.toLowerCase() === wanted)
+          )
+
+          if (matches.length === 1 && matches[0]) return matches[0]
+
+          return yield* new NotFound({
+            what: matches.length > 1 ? `A single playlist named "${playlist}"` : `Playlist "${playlist}"`,
+            hint: matches.length > 1
+              ? "Several playlists share that name. Pass its URI from spotr playlist ls."
+              : "Run spotr playlist ls to see your playlists."
+          })
+        })
+
+      const addToPlaylist = (playlist: string, uri: SpotifyUri | undefined) =>
+        Effect.gen(function* () {
+          const found = yield* findPlaylist(playlist)
+          const track = yield* target(uri)
+
+          if (!found.canAdd) {
+            return yield* new NotFound({
+              what: `A playlist you can add to named "${found.name}"`,
+              hint: "You can only add to your own and collaborative playlists."
+            })
+          }
+
+          yield* bridge.call("PlaylistAPI", "add", found.uri, [track.uri], { after: "end" }, {})
+
+          return new PlaylistAddResult({ playlist: found, ...track })
+        })
+
       const volume = bridge.call("PlaybackAPI", "getVolume").pipe(
         Effect.flatMap(decodeLevel),
         Effect.flatMap((level) => decodeVolume(Math.round(level * 100))),
@@ -255,6 +272,10 @@ export class Spotify extends Context.Service<Spotify, {
         addToQueue,
         removeFromQueue,
         clearQueue,
+        like: setLiked(true),
+        unlike: setLiked(false),
+        playlists,
+        addToPlaylist,
         volume,
         setVolume
       }

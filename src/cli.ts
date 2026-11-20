@@ -6,7 +6,17 @@ import { CdpBridge } from "./bridge/CdpBridge.ts"
 import { parseSeek } from "./domain/Seek.ts"
 import { SpotifyUri, toSpotifyUri } from "./domain/Track.ts"
 import { Volume } from "./domain/Volume.ts"
-import { present, queueText, repeatText, shuffleText, statusText, volumeText } from "./render.ts"
+import {
+  likeText,
+  playlistAddText,
+  playlistsText,
+  present,
+  queueText,
+  repeatText,
+  shuffleText,
+  statusText,
+  volumeText
+} from "./render.ts"
 import { Json, Port } from "./settings.ts"
 import { Spotify } from "./spotify/Spotify.ts"
 
@@ -94,6 +104,39 @@ const queue = Command.make("queue", {}, () =>
   Command.withDescription("Show what plays next, or change your queue")
 )
 
+const like = Command.make(
+  "like",
+  { uri: uriArgument("The track to like. Defaults to the playing track").pipe(Argument.optional) },
+  ({ uri }) => Spotify.use((spotify) => spotify.like(Option.getOrUndefined(uri))).pipe(present(likeText))
+).pipe(Command.withDescription("Add a track to Liked Songs"))
+
+const unlike = Command.make(
+  "unlike",
+  { uri: uriArgument("The track to unlike. Defaults to the playing track").pipe(Argument.optional) },
+  ({ uri }) => Spotify.use((spotify) => spotify.unlike(Option.getOrUndefined(uri))).pipe(present(likeText))
+).pipe(Command.withDescription("Remove a track from Liked Songs"))
+
+const playlistList = Command.make("ls", {}, () =>
+  Spotify.use((spotify) => spotify.playlists).pipe(present(playlistsText))
+).pipe(Command.withDescription("List your playlists"))
+
+const playlistAdd = Command.make(
+  "add",
+  {
+    playlist: Argument.String("playlist").pipe(Argument.withDescription("The playlist's name or URI")),
+    uri: uriArgument("The track to add. Defaults to the playing track").pipe(Argument.optional)
+  },
+  ({ playlist, uri }) =>
+    Spotify.use((spotify) => spotify.addToPlaylist(playlist, Option.getOrUndefined(uri))).pipe(
+      present(playlistAddText)
+    )
+).pipe(Command.withDescription("Add a track to one of your playlists"))
+
+const playlist = Command.make("playlist").pipe(
+  Command.withSubcommands([playlistList, playlistAdd]),
+  Command.withDescription("List your playlists, or add a track to one")
+)
+
 const volume = Command.make(
   "volume",
   {
@@ -116,7 +159,22 @@ const volume = Command.make(
 ).pipe(Command.withDescription("Show the volume, or set it"))
 
 export const spotr = Command.make("spotr").pipe(
-  Command.withSubcommands([status, play, pause, resume, next, previous, seek, shuffle, repeat, queue, volume]),
+  Command.withSubcommands([
+    status,
+    play,
+    pause,
+    resume,
+    next,
+    previous,
+    seek,
+    shuffle,
+    repeat,
+    queue,
+    like,
+    unlike,
+    playlist,
+    volume
+  ]),
   Command.provide(
     Spotify.layer.pipe(
       Layer.provide(CdpBridge),
