@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { Effect, Fiber, Layer } from "effect"
 import { TestClock } from "effect/testing"
 import { FakeBridge } from "../src/bridge/FakeBridge.ts"
+import { Volume } from "../src/domain/Volume.ts"
 import { Spotify } from "../src/spotify/Spotify.ts"
 
 const spotifyWith = (staleReads: number) => Spotify.layer.pipe(Layer.provide(FakeBridge(staleReads)))
@@ -38,6 +39,15 @@ describe("Spotify", () => {
 
       assert.strictEqual(skipped.name, "Windowlicker")
     }).pipe(Effect.provide(spotifyWith(3))))
+
+  it.effect("setVolume sends a level that volume reads back", () =>
+    Effect.gen(function* () {
+      const spotify = yield* Spotify
+
+      assert.strictEqual(yield* spotify.volume, 100)
+      yield* spotify.setVolume(Volume.make(30))
+      assert.strictEqual(yield* spotify.volume, 30)
+    }).pipe(Effect.provide(spotifyWith(0))))
 
   it.effect("next gives up and returns the old track when it never changes", () =>
     Effect.gen(function* () {

@@ -46,10 +46,11 @@ export const CdpBridge = Layer.effect(
       })
     )
 
-    const call = (api: string, method: string) =>
+    const call = (api: string, method: string, ...args: ReadonlyArray<Schema.Json>) =>
       Effect.gen(function* () {
         const page = yield* findPage
-        const expression = `(${AGENT_SOURCE})().dispatch(${JSON.stringify(api)}, ${JSON.stringify(method)})`
+        const params = [api, method, args].map((value) => JSON.stringify(value)).join(", ")
+        const expression = `(${AGENT_SOURCE})().dispatch(${params})`
 
         const raw = yield* Cdp.evaluate(page.webSocketDebuggerUrl, expression).pipe(
           Effect.catchTag("SocketError", () => Effect.fail(notRunning))

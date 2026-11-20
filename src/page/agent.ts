@@ -9,7 +9,9 @@ type ModuleExport = { readonly [opaque]: "ModuleExport" }
 
 type InternalValue = { readonly [opaque]: "InternalValue" }
 
-type InternalMethod = () => Promise<InternalValue | undefined> | InternalValue | undefined
+type Json = null | number | boolean | string | ReadonlyArray<Json> | { readonly [key: string]: Json }
+
+type InternalMethod = (...args: ReadonlyArray<Json>) => Promise<InternalValue | undefined> | InternalValue | undefined
 
 type InternalApi = { readonly [method: string]: InternalMethod | undefined }
 
@@ -33,7 +35,7 @@ export type DispatchResult =
 
 type Agent = {
   readonly version: number
-  readonly dispatch: (api: string, method: string) => Promise<DispatchResult>
+  readonly dispatch: (api: string, method: string, args: ReadonlyArray<Json>) => Promise<DispatchResult>
 }
 
 declare global {
@@ -45,7 +47,7 @@ declare global {
 }
 
 export const installAgent = (): Agent => {
-  const version = 1
+  const version = 2
 
   if (window.__spotr?.version === version) return window.__spotr
 
@@ -125,7 +127,7 @@ export const installAgent = (): Agent => {
 
   const agent: Agent = {
     version,
-    async dispatch(api, method) {
+    async dispatch(api, method, args) {
       if (!registry) return { ok: false, kind: "NotReady", message: "Spotify's internal registry wasn't found" }
       const target = resolveApi(api)
 
@@ -135,7 +137,7 @@ export const installAgent = (): Agent => {
       if (!fn) return { ok: false, kind: "MethodMissing", message: `${api} has no method ${method}` }
 
       try {
-        const value = await fn.call(target)
+        const value = await fn.call(target, ...args)
 
         // A JSON round trip turns Spotify's class instances into plain
         // data that survives the trip back over the DevTools socket.

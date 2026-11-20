@@ -1,4 +1,4 @@
-import { Effect, Layer, Ref } from "effect"
+import { Effect, Layer, Ref, Schema } from "effect"
 import { Bridge } from "./Bridge.ts"
 
 const queue = [
@@ -23,14 +23,14 @@ export const FakeBridge = (staleReads: number) => Layer.effect(
   Effect.gen(function* () {
     const position = yield* Ref.make(0)
     const staleLeft = yield* Ref.make(0)
-
-    const stateAt = (index: number) => ({ item: queue[index % queue.length], isPaused: false })
+    const paused = yield* Ref.make(false)
 
     const getState = Effect.gen(function* () {
       const index = yield* Ref.get(position)
       const stale = yield* Ref.getAndUpdate(staleLeft, (left) => Math.max(0, left - 1))
+      const shown = stale > 0 ? index - 1 : index
 
-      return stale > 0 ? stateAt(index - 1) : stateAt(index)
+      return { item: queue[shown % queue.length], isPaused: yield* Ref.get(paused) }
     })
 
     const skipToNext = Effect.gen(function* () {
@@ -38,14 +38,29 @@ export const FakeBridge = (staleReads: number) => Layer.effect(
       yield* Ref.set(staleLeft, staleReads)
     })
 
-    const handlers = new Map<string, Effect.Effect<unknown>>([
-      ["PlayerAPI.getState", getState],
-      ["PlayerAPI.skipToNext", skipToNext]
+    const level = yield* Ref.make(1)
+
+    const setVolume = (args: ReadonlyArray<Schema.Json>) =>
+      Schema.decodeUnknownEffect(Schema.Tuple([Schema.Finite]))(args).pipe(
+        Effect.orDie,
+        Effect.flatMap(([next]) => Ref.set(level, next))
+      )
+
+    const handlers = new Map<string, (args: ReadonlyArray<Schema.Json>) => Effect.Effect<unknown>>([
+      ["PlayerAPI.getState", () => getState],
+      ["PlayerAPI.skipToNext", () => skipToNext],
+      ["PlayerAPI.pause", () => Ref.set(paused, true)],
+      ["PlayerAPI.resume", () => Ref.set(paused, false)],
+      ["PlaybackAPI.getVolume", () => Ref.get(level)],
+      ["PlaybackAPI.setVolume", setVolume]
     ])
 
     return {
-      call: (api: string, method: string) =>
-        handlers.get(`${api}.${method}`) ?? Effect.die(`FakeBridge has no ${api}.${method}`)
+      call: (api: string, method: string, ...args: ReadonlyArray<Schema.Json>) => {
+        const handler = handlers.get(`${api}.${method}`)
+
+        return handler ? handler(args) : Effect.die(`FakeBridge has no ${api}.${method}`)
+      }
     }
   })
 )
