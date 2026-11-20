@@ -14,17 +14,22 @@ const Targets = Schema.Array(Schema.Struct({
   webSocketDebuggerUrl: Schema.String
 }))
 
-// What the page agent's dispatch() resolves to.
-const DispatchResult = Schema.Union([
-  Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }),
-  Schema.Struct({
-    ok: Schema.Literal(false),
-    kind: Schema.Literals(["NotReady", "ApiMissing", "MethodMissing", "Rejected"]),
-    message: Schema.String
-  })
-])
+const Failure = Schema.Struct({
+  ok: Schema.Literal(false),
+  kind: Schema.Literals(["NotReady", "ApiMissing", "MethodMissing", "Rejected"]),
+  message: Schema.String
+})
 
-const decodeDispatch = Schema.decodeUnknownEffect(DispatchResult)
+// What the page agent's dispatch() and inspect() resolve to.
+const decodeDispatch = Schema.decodeUnknownEffect(Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), value: Schema.Unknown }),
+  Failure
+]))
+
+const decodeInspect = Schema.decodeUnknownEffect(Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), value: Schema.Array(Schema.String) }),
+  Failure
+]))
 
 const AGENT_SOURCE = installAgent.toString()
 
@@ -34,45 +39,58 @@ export const CdpBridge = Layer.effect(
     const port = yield* Port
     const http = yield* HttpClient.HttpClient
     const webSocket = yield* Socket.WebSocketConstructor
-    const notRunning = new ClientNotRunning({ port })
 
     const findPage = http.get(`http://127.0.0.1:${port}/json/list`).pipe(
       Effect.flatMap(HttpClientResponse.schemaBodyJson(Targets)),
-      Effect.mapError(() => notRunning),
+      Effect.mapError(() => new ClientNotRunning({ port, reason: "port" })),
       Effect.flatMap((targets) => {
         const page = targets.find((t) => t.type === "page" && t.url.includes("xpui"))
 
-        return page ? Effect.succeed(page) : Effect.fail(notRunning)
+        return page ? Effect.succeed(page) : Effect.fail(new ClientNotRunning({ port, reason: "page" }))
       })
     )
 
-    const call = (api: string, method: string, ...args: ReadonlyArray<Schema.Json>) =>
+    // Runs the agent with `use` appended, e.g. `.dispatch(...)`, and
+    // returns what it resolves to.
+    const runAgent = (operation: string, use: string) =>
       Effect.gen(function* () {
         const page = yield* findPage
-        const params = [api, method, args].map((value) => JSON.stringify(value)).join(", ")
-        const expression = `(${AGENT_SOURCE})().dispatch(${params})`
 
-        const raw = yield* Cdp.evaluate(page.webSocketDebuggerUrl, expression).pipe(
-          Effect.catchTag("SocketError", () => Effect.fail(notRunning))
+        return yield* Cdp.evaluate(page.webSocketDebuggerUrl, `(${AGENT_SOURCE})()${use}`).pipe(
+          Effect.catchTag("SocketError", () => Effect.fail(new ClientNotRunning({ port, reason: "port" })))
         )
-
-        const result = yield* decodeDispatch(raw).pipe(Effect.orDie)
-
-        if (result.ok) return result.value
-
-        return yield* new InternalApiChanged({
-          operation: `${api}.${method}`,
-          issue: `${result.kind}: ${result.message}`
-        })
       }).pipe(
         Effect.scoped,
         Effect.provideService(Socket.WebSocketConstructor, webSocket),
         Effect.timeoutOrElse({
           duration: "5 seconds",
-          orElse: () => Effect.fail(new BridgeTimeout({ operation: `${api}.${method}` }))
+          orElse: () => Effect.fail(new BridgeTimeout({ operation }))
         })
       )
 
-    return { call }
+    const params = (...values: ReadonlyArray<Schema.Json>) => values.map((value) => JSON.stringify(value)).join(", ")
+
+    const call = (api: string, method: string, ...args: ReadonlyArray<Schema.Json>) =>
+      Effect.gen(function* () {
+        const operation = `${api}.${method}`
+        const raw = yield* runAgent(operation, `.dispatch(${params(api, method, args)})`)
+        const result = yield* decodeDispatch(raw).pipe(Effect.orDie)
+
+        if (result.ok) return result.value
+
+        return yield* new InternalApiChanged({ operation, issue: `${result.kind}: ${result.message}` })
+      })
+
+    const inspect = (api: string, methods: ReadonlyArray<string>) =>
+      Effect.gen(function* () {
+        const raw = yield* runAgent(api, `.inspect(${params(api, methods)})`)
+        const result = yield* decodeInspect(raw).pipe(Effect.orDie)
+
+        if (result.ok) return result.value
+
+        return yield* new InternalApiChanged({ operation: api, issue: `${result.kind}: ${result.message}` })
+      })
+
+    return { call, inspect }
   })
 )

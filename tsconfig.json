@@ -25,6 +25,7 @@
           "effect/cli",
           "effect/http",
           "effect/socket",
+          "effect/process",
           "@effect/platform-node"
         ],
         "overrides": [
@@ -35,6 +36,7 @@
                 "effect/cli",
                 "effect/http",
                 "effect/socket",
+                "effect/process",
                 "@effect/platform-node",
                 "effect/testing",
                 "@effect/vitest",

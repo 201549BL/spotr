@@ -1,4 +1,5 @@
-import { Console, Effect } from "effect"
+import { Console, Effect, Stream } from "effect"
+import type { Check } from "./domain/Check.ts"
 import type { Device } from "./domain/Device.ts"
 import type { SpotifyError } from "./domain/errors.ts"
 import type { PlayerStatus } from "./domain/PlayerStatus.ts"
@@ -21,6 +22,19 @@ export const present = <A>(toText: (value: A) => string) =>
       )
 
       yield* Console.log(json ? JSON.stringify(value) : toText(value))
+    })
+
+// Like present, for a stream: prints each value as it arrives, one JSON
+// object per line with --json.
+export const presentEach = <A>(toText: (value: A) => string) =>
+  <R>(self: Stream.Stream<A, SpotifyError, R>) =>
+    Effect.gen(function* () {
+      const json = yield* Json
+
+      yield* self.pipe(
+        Stream.runForEach((value) => Console.log(json ? JSON.stringify(value) : toText(value))),
+        Effect.tapError((error) => Console.error(json ? errorJson(error) : errorText(error)))
+      )
     })
 
 const errorText = (error: SpotifyError) =>
@@ -83,6 +97,24 @@ export const devicesText = (devices: ReadonlyArray<Device>) =>
   devices
     .map((device) => `${device.active ? "▶" : " "} ${device.name} · ${device.type}${device.local ? " · this computer" : ""}`)
     .join("\n")
+
+// One line per change, for spotr watch.
+export const watchText = ({ track, paused }: PlayerStatus) =>
+  track ? `${paused ? "⏸" : "▶"} ${trackLine(track)}` : "Nothing playing"
+
+const checkMarks = { pass: "✓", fail: "✗", skipped: "-" }
+
+export const doctorText = (checks: ReadonlyArray<Check>) =>
+  checks
+    .map(({ name, status, detail }) => {
+      const suffix = status === "skipped" ? " (skipped)" : detail ? `\n    ${detail}` : ""
+
+      return `${checkMarks[status]} ${name}${suffix}`
+    })
+    .join("\n")
+
+export const launchText = ({ started, port }: { readonly started: boolean; readonly port: number }) =>
+  started ? `Started Spotify with DevTools on port ${port}` : `Spotify is already reachable on port ${port}`
 
 export const shuffleText = ({ shuffle }: PlayerStatus) => `Shuffle ${shuffle ? "on" : "off"}`
 

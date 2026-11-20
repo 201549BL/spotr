@@ -4,19 +4,30 @@ export class ClientNotRunning extends Schema.TaggedError<
   ClientNotRunning,
   { readonly brand: unique symbol }
 >()("ClientNotRunning", {
-  port: Schema.Int
+  port: Schema.Int,
+  // "port": nothing answers on the DevTools port. "page": something
+  // answers, but Spotify's main window isn't among its pages.
+  reason: Schema.Literals(["port", "page"])
 }) {
   readonly [Runtime.errorExitCode] = 3
   readonly [Runtime.errorReported] = false
 
   get message() {
-    return `Spotify isn't reachable on port ${this.port}`
+    return this.reason === "port"
+      ? `Spotify isn't reachable on port ${this.port}`
+      : `Spotify's window wasn't found on port ${this.port}`
   }
 
-  readonly hint = "Start Spotify with --remote-debugging-port=9222, or pass --port."
+  get hint() {
+    return this.reason === "port"
+      ? `Run spotr launch, or start Spotify with --remote-debugging-port=${this.port}.`
+      : "Spotify may still be starting. Wait a moment and try again."
+  }
 
   get detail() {
-    return `Nothing answered on http://127.0.0.1:${this.port}/json/list`
+    return this.reason === "port"
+      ? `Nothing answered on http://127.0.0.1:${this.port}/json/list`
+      : `http://127.0.0.1:${this.port}/json/list has no page with "xpui" in its URL`
   }
 }
 
@@ -83,4 +94,65 @@ export class NotFound extends Schema.TaggedError<
   }
 }
 
-export type SpotifyError = BridgeError | InternalApiChanged | NotFound
+export class SpotifyWithoutDebugPort extends Schema.TaggedError<
+  SpotifyWithoutDebugPort,
+  { readonly brand: unique symbol }
+>()("SpotifyWithoutDebugPort", {
+  port: Schema.Int
+}) {
+  readonly [Runtime.errorExitCode] = 3
+  readonly [Runtime.errorReported] = false
+
+  get message() {
+    return "Spotify is running, but without the DevTools port"
+  }
+
+  get hint() {
+    return "Quit Spotify, then run spotr launch again."
+  }
+
+  get detail() {
+    return `Spotify only opens port ${this.port} when it starts with --remote-debugging-port=${this.port}`
+  }
+}
+
+export class LaunchFailed extends Schema.TaggedError<
+  LaunchFailed,
+  { readonly brand: unique symbol }
+>()("LaunchFailed", {
+  issue: Schema.String
+}) {
+  readonly [Runtime.errorExitCode] = 3
+  readonly [Runtime.errorReported] = false
+
+  get message() {
+    return "spotr couldn't start Spotify"
+  }
+
+  get hint() {
+    return "Check that Spotify is installed in /Applications."
+  }
+
+  get detail() {
+    return this.issue
+  }
+}
+
+export type SpotifyError =
+  | BridgeError
+  | InternalApiChanged
+  | NotFound
+  | SpotifyWithoutDebugPort
+  | LaunchFailed
+
+// doctor already printed which checks failed, so this only sets the exit
+// code.
+export class ChecksFailed extends Schema.TaggedError<
+  ChecksFailed,
+  { readonly brand: unique symbol }
+>()("ChecksFailed", {
+  failed: Schema.Int
+}) {
+  readonly [Runtime.errorExitCode] = 6
+  readonly [Runtime.errorReported] = false
+}

@@ -335,7 +335,9 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
         const handler = handlers.get(`${api}.${method}`)
 
         return handler ? handler(args) : Effect.die(`FakeBridge has no ${api}.${method}`)
-      }
+      },
+      inspect: (api: string, methods: ReadonlyArray<string>) =>
+        Effect.succeed(methods.filter((method) => !handlers.has(`${api}.${method}`)))
     }
   })
 )

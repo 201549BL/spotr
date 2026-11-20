@@ -30,13 +30,21 @@ type Fiber = {
   readonly memoizedProps: { readonly value?: Platform } | null
 }
 
-export type DispatchResult =
-  | { readonly ok: true; readonly value: InternalValue | null }
-  | { readonly ok: false; readonly kind: "NotReady" | "ApiMissing" | "MethodMissing" | "Rejected"; readonly message: string }
+type Failure = {
+  readonly ok: false
+  readonly kind: "NotReady" | "ApiMissing" | "MethodMissing" | "Rejected"
+  readonly message: string
+}
+
+export type DispatchResult = { readonly ok: true; readonly value: InternalValue | null } | Failure
+
+// The methods of `methods` that the API lacks. Nothing is called.
+export type InspectResult = { readonly ok: true; readonly value: ReadonlyArray<string> } | Failure
 
 type Agent = {
   readonly version: number
   readonly dispatch: (api: string, method: string, args: ReadonlyArray<Json>) => Promise<DispatchResult>
+  readonly inspect: (api: string, methods: ReadonlyArray<string>) => InspectResult
 }
 
 declare global {
@@ -46,7 +54,7 @@ declare global {
 }
 
 export const installAgent = (): Agent => {
-  const version = 3
+  const version = 4
 
   if (window.__spotr?.version === version) return window.__spotr
 
@@ -98,6 +106,14 @@ export const installAgent = (): Agent => {
 
   const agent: Agent = {
     version,
+    inspect(api, methods) {
+      if (!registry) return { ok: false, kind: "NotReady", message: "Spotify's internal registry wasn't found" }
+      const target = resolveApi(api)
+
+      if (!target) return { ok: false, kind: "ApiMissing", message: `No internal API named ${api}` }
+
+      return { ok: true, value: methods.filter((method) => !target[method]) }
+    },
     async dispatch(api, method, args) {
       if (!registry) return { ok: false, kind: "NotReady", message: "Spotify's internal registry wasn't found" }
       const target = resolveApi(api)

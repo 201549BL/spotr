@@ -1,5 +1,6 @@
-import { Clock, Context, Effect, Layer, Schedule, type Schema } from "effect"
+import { Clock, Context, Effect, Layer, Schedule, type Schema, Stream } from "effect"
 import { Bridge } from "../bridge/Bridge.ts"
+import { Check } from "../domain/Check.ts"
 import type { Device } from "../domain/Device.ts"
 import { NotFound, type SpotifyError } from "../domain/errors.ts"
 import type { PlayerStatus, Repeat } from "../domain/PlayerStatus.ts"
@@ -23,6 +24,41 @@ import {
   toStatus,
   toTrack
 } from "./raw.ts"
+
+// Every internal method spotr calls. `call` accepts only these, and
+// doctor checks that each one exists, so the two can't drift apart.
+const uses = {
+  PlayerAPI: [
+    "getState",
+    "getQueue",
+    "play",
+    "pause",
+    "resume",
+    "skipToNext",
+    "skipToPrevious",
+    "seekTo",
+    "setShuffle",
+    "setRepeat",
+    "addToQueue",
+    "removeFromQueue",
+    "clearQueue"
+  ],
+  PlaybackAPI: ["getVolume", "setVolume"],
+  LibraryAPI: ["add", "remove", "contains"],
+  RootlistAPI: ["getContents"],
+  PlaylistAPI: ["add"],
+  ConnectDevicesAPI: ["getDevices"],
+  ConnectTransferAPI: ["transferPlayback"]
+} as const
+
+type Api = keyof typeof uses
+
+// How one API looked to doctor.
+type Inspection =
+  | { readonly kind: "ok" | "no-port" | "no-page" | "unreachable" }
+  | { readonly kind: "missing"; readonly detail: string }
+
+const sameMoment = (a: PlayerStatus, b: PlayerStatus) => a.track?.uri === b.track?.uri && a.paused === b.paused
 
 export class Spotify extends Context.Service<Spotify, {
   readonly status: Effect.Effect<PlayerStatus, SpotifyError>
@@ -49,14 +85,21 @@ export class Spotify extends Context.Service<Spotify, {
   readonly useDevice: (device: string) => Effect.Effect<ReadonlyArray<Device>, SpotifyError>
   readonly volume: Effect.Effect<Volume, SpotifyError>
   readonly setVolume: (level: Volume) => Effect.Effect<void, SpotifyError>
+  // Emits the status now, then again whenever the track or play state
+  // changes. It checks once a second.
+  readonly watch: Stream.Stream<PlayerStatus, SpotifyError>
+  readonly doctor: Effect.Effect<ReadonlyArray<Check>>
 }>()("spotr/Spotify") {
   static readonly layer = Layer.effect(
     Spotify,
     Effect.gen(function* () {
       const bridge = yield* Bridge
 
+      const call = <A extends Api>(api: A, method: (typeof uses)[A][number], ...args: ReadonlyArray<Schema.Json>) =>
+        bridge.call(api, method, ...args)
+
       const status = Effect.gen(function* () {
-        const raw = yield* bridge.call("PlayerAPI", "getState").pipe(Effect.flatMap(decodeState))
+        const raw = yield* call("PlayerAPI", "getState").pipe(Effect.flatMap(decodeState))
 
         return toStatus(raw, yield* Clock.currentTimeMillis)
       }).pipe(blameUpdate("PlayerAPI.getState"))
@@ -69,8 +112,8 @@ export class Spotify extends Context.Service<Spotify, {
 
       const settle = (done: (status: PlayerStatus) => boolean) => pollUntil(status, done)
 
-      const command = (method: string, ...args: ReadonlyArray<Schema.Json>) =>
-        bridge.call("PlayerAPI", method, ...args)
+      const command = (method: (typeof uses)["PlayerAPI"][number], ...args: ReadonlyArray<Schema.Json>) =>
+        call("PlayerAPI", method, ...args)
 
       // Done once Spotify plays from `uri` and something visibly changed,
       // so replaying the album that's already on doesn't count as done
@@ -134,7 +177,7 @@ export class Spotify extends Context.Service<Spotify, {
           Effect.andThen(settle((now) => now.repeat === mode))
         )
 
-      const rawQueue = bridge.call("PlayerAPI", "getQueue").pipe(
+      const rawQueue = call("PlayerAPI", "getQueue").pipe(
         Effect.flatMap(decodeQueue),
         blameUpdate("PlayerAPI.getQueue")
       )
@@ -193,7 +236,7 @@ export class Spotify extends Context.Service<Spotify, {
         })
 
       const isLiked = (uri: SpotifyUri) =>
-        bridge.call("LibraryAPI", "contains", uri).pipe(
+        call("LibraryAPI", "contains", uri).pipe(
           Effect.flatMap(decodeContains),
           Effect.map(([liked]) => liked === true),
           blameUpdate("LibraryAPI.contains")
@@ -203,14 +246,14 @@ export class Spotify extends Context.Service<Spotify, {
         Effect.gen(function* () {
           const track = yield* target(uri)
 
-          yield* bridge.call("LibraryAPI", liked ? "add" : "remove", { uris: [track.uri] })
+          yield* call("LibraryAPI", liked ? "add" : "remove", { uris: [track.uri] })
 
           const now = yield* pollUntil(isLiked(track.uri), (value) => value === liked)
 
           return new LikeResult({ ...track, liked: now })
         })
 
-      const playlists = bridge.call("RootlistAPI", "getContents").pipe(
+      const playlists = call("RootlistAPI", "getContents").pipe(
         Effect.flatMap(decodeRootlist),
         Effect.map((root) => toPlaylists(root)),
         blameUpdate("RootlistAPI.getContents")
@@ -249,7 +292,7 @@ export class Spotify extends Context.Service<Spotify, {
             })
           }
 
-          yield* bridge.call("PlaylistAPI", "add", found.uri, [track.uri], { after: "end" }, {})
+          yield* call("PlaylistAPI", "add", found.uri, [track.uri], { after: "end" }, {})
 
           return new PlaylistAddResult({ playlist: found, ...track })
         })
@@ -257,7 +300,7 @@ export class Spotify extends Context.Service<Spotify, {
       // ConnectDevicesAPI and ConnectTransferAPI exist from startup.
       // ConnectAPI would do the same job, but creating it starts a
       // device search on the local network.
-      const devices = bridge.call("ConnectDevicesAPI", "getDevices").pipe(
+      const devices = call("ConnectDevicesAPI", "getDevices").pipe(
         Effect.flatMap(decodeDevices),
         Effect.map(toDevices),
         blameUpdate("ConnectDevicesAPI.getDevices")
@@ -280,19 +323,58 @@ export class Spotify extends Context.Service<Spotify, {
 
           if (found.active) return all
 
-          yield* bridge.call("ConnectTransferAPI", "transferPlayback", found.id, { interactionId: "" })
+          yield* call("ConnectTransferAPI", "transferPlayback", found.id, { interactionId: "" })
 
           return yield* pollUntil(devices, (now) => now.some((candidate) => candidate.id === found.id && candidate.active))
         })
 
-      const volume = bridge.call("PlaybackAPI", "getVolume").pipe(
+      const volume = call("PlaybackAPI", "getVolume").pipe(
         Effect.flatMap(decodeLevel),
         Effect.flatMap((level) => decodeVolume(Math.round(level * 100))),
         blameUpdate("PlaybackAPI.getVolume")
       )
 
       const setVolume = (level: Volume) =>
-        bridge.call("PlaybackAPI", "setVolume", level / 100).pipe(Effect.asVoid)
+        call("PlaybackAPI", "setVolume", level / 100).pipe(Effect.asVoid)
+
+      const watch = Stream.fromEffectSchedule(status, Schedule.spaced("1 second")).pipe(Stream.changesWith(sameMoment))
+
+      const inspect = (api: Api) =>
+        bridge.inspect(api, uses[api]).pipe(
+          Effect.map((missing): Inspection =>
+            missing.length === 0 ? { kind: "ok" } : { kind: "missing", detail: `lacks ${missing.join(", ")}` }
+          ),
+          Effect.catchTags({
+            ClientNotRunning: (error) => Effect.succeed<Inspection>({ kind: error.reason === "port" ? "no-port" : "no-page" }),
+            BridgeTimeout: () => Effect.succeed<Inspection>({ kind: "unreachable" }),
+            InternalApiChanged: (error) =>
+              Effect.succeed<Inspection>(
+                error.issue.startsWith("NotReady") ? { kind: "unreachable" } : { kind: "missing", detail: error.issue }
+              )
+          })
+        )
+
+      // Each check runs only when the ones before it passed.
+      const doctor = Effect.gen(function* () {
+        const apis = Object.keys(uses).filter((key): key is Api => key in uses)
+        const inspections = yield* Effect.forEach(apis, (api) => inspect(api).pipe(Effect.map((result) => ({ api, result }))))
+        const kinds = inspections.map(({ result }) => result.kind)
+        const portOk = !kinds.includes("no-port")
+        const pageOk = portOk && !kinds.includes("no-page")
+        const agentOk = pageOk && !kinds.includes("unreachable")
+
+        const step = (name: string, ok: boolean, ready: boolean, detail: string) =>
+          new Check({ name, status: !ready ? "skipped" : ok ? "pass" : "fail", detail: ready && !ok ? detail : "" })
+
+        return [
+          step("Spotify answers on the DevTools port", portOk, true, "Run spotr launch, or start Spotify with --remote-debugging-port."),
+          step("Spotify's window is open", pageOk, portOk, "Spotify may still be starting."),
+          step("spotr's agent reaches Spotify's internals", agentOk, pageOk, "Spotify didn't answer, or its internals have moved."),
+          ...inspections.map(({ api, result }) =>
+            step(`${api} has the ${uses[api].length === 1 ? "method" : `${uses[api].length} methods`} spotr uses`, result.kind === "ok", agentOk, "detail" in result ? result.detail : "")
+          )
+        ]
+      })
 
       return {
         status,
@@ -315,7 +397,9 @@ export class Spotify extends Context.Service<Spotify, {
         devices,
         useDevice,
         volume,
-        setVolume
+        setVolume,
+        watch,
+        doctor
       }
     })
   )

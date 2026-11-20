@@ -3,11 +3,16 @@ import { Argument, Command } from "effect/cli"
 import { FetchHttpClient } from "effect/http"
 import { Socket } from "effect/socket"
 import { CdpBridge } from "./bridge/CdpBridge.ts"
+import { ChecksFailed } from "./domain/errors.ts"
 import { parseSeek } from "./domain/Seek.ts"
 import { SpotifyUri, toSpotifyUri } from "./domain/Track.ts"
 import { Volume } from "./domain/Volume.ts"
 import {
   devicesText,
+  doctorText,
+  launchText,
+  presentEach,
+  watchText,
   likeText,
   playlistAddText,
   playlistsText,
@@ -19,6 +24,7 @@ import {
   volumeText
 } from "./render.ts"
 import { Json, Port } from "./settings.ts"
+import { Launcher } from "./spotify/Launcher.ts"
 import { Spotify } from "./spotify/Spotify.ts"
 
 const uriArgument = (description: string) =>
@@ -151,6 +157,28 @@ const devices = Command.make("devices", {}, () =>
   Command.withDescription("List Spotify Connect devices, or switch to one")
 )
 
+const watch = Command.make("watch", {}, () =>
+  Spotify.use((spotify) => Effect.succeed(spotify.watch)).pipe(Effect.flatMap(presentEach(watchText)))
+).pipe(Command.withDescription("Print a line whenever the track or play state changes. Ctrl+C stops"))
+
+const launch = Command.make("launch", {}, () =>
+  Launcher.use((launcher) => launcher.launch).pipe(present(launchText))
+).pipe(
+  Command.provide(Launcher.layer),
+  Command.withDescription("Start Spotify with its DevTools port open (macOS)")
+)
+
+const doctor = Command.make("doctor", {}, () =>
+  Effect.gen(function* () {
+    const checks = yield* Spotify.use((spotify) => spotify.doctor)
+    const failed = checks.filter((check) => check.status === "fail").length
+
+    yield* Effect.succeed(checks).pipe(present(doctorText))
+
+    if (failed > 0) return yield* new ChecksFailed({ failed })
+  })
+).pipe(Command.withDescription("Check that spotr can reach and drive Spotify"))
+
 const volume = Command.make(
   "volume",
   {
@@ -188,7 +216,10 @@ export const spotr = Command.make("spotr").pipe(
     unlike,
     playlist,
     devices,
-    volume
+    volume,
+    watch,
+    launch,
+    doctor
   ]),
   Command.provide(
     Spotify.layer.pipe(
