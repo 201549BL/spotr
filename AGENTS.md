@@ -18,7 +18,13 @@ Run from `cli/`.
 spotr is being rebuilt one concept at a time so its owner can learn Effect. Add a folder only when the current step needs it, and don't jump ahead. The finished design (spotify/, domain/, bridge/, page/, test/) is committed on branch `worktree-agent-a1982c5e57f983af7` for reference.
 
 - `src/main.ts` is the entry point and the only place a runtime is created.
-- `src/cli.ts` holds the command tree. Commands print placeholders until the Spotify service exists.
+- `src/cli.ts` holds the command tree, output printing, and the layer wiring.
+- `src/settings.ts` defines the global `--json` and `--port` settings.
+- `src/domain/` holds the Schema models and tagged errors.
+- `src/spotify/Spotify.ts` is the service commands use. It decodes Spotify's raw data into domain types.
+- `src/bridge/` is the seam to Spotify. `Bridge.ts` is the interface, `CdpBridge.ts` and `Cdp.ts` reach the real app, and `FakeBridge.ts` stands in for it in tests.
+- `src/page/agent.ts` runs inside Spotify's page. It is sent as source text, so its function body must be self-contained.
+- `test/` holds Vitest tests, which run `Spotify` on `FakeBridge`.
 - `tools/oxlint/anti-slop/` is vendored. See its `UPSTREAM.md` before changing it.
 
 The rules below describe the finished design. Rules for pieces that don't exist yet apply once they're added.
