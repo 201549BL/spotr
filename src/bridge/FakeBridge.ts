@@ -1,7 +1,14 @@
 import { Effect, Layer, Ref, Schema } from "effect"
 import { Bridge } from "./Bridge.ts"
 
-const queue = [
+type RawTrack = {
+  readonly uri: string
+  readonly name: string
+  readonly artists: ReadonlyArray<{ readonly name: string }>
+  readonly durationMs: number
+}
+
+export const sampleQueue: ReadonlyArray<RawTrack> = [
   {
     uri: "spotify:track:6sGIMrtIzQjdzkxDfA4Gxu",
     name: "Teardrop",
@@ -16,27 +23,36 @@ const queue = [
   }
 ]
 
-// After a skip, the first `staleReads` calls to getState still report
-// the previous track, the way real Spotify lags behind.
-export const FakeBridge = (staleReads: number) => Layer.effect(
+// Plays `queue` in a loop; an empty queue means nothing is loaded. After
+// a command, the first `staleReads` calls to getState still report the
+// old state, the way real Spotify lags behind.
+export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) => Layer.effect(
   Bridge,
   Effect.gen(function* () {
     const position = yield* Ref.make(0)
     const staleLeft = yield* Ref.make(0)
     const paused = yield* Ref.make(false)
+    const shownPosition = yield* Ref.make(0)
+
+    const shownPaused = yield* Ref.make(false)
 
     const getState = Effect.gen(function* () {
-      const index = yield* Ref.get(position)
       const stale = yield* Ref.getAndUpdate(staleLeft, (left) => Math.max(0, left - 1))
-      const shown = stale > 0 ? index - 1 : index
 
-      return { item: queue[shown % queue.length], isPaused: yield* Ref.get(paused) }
+      if (stale === 0) {
+        yield* Ref.set(shownPosition, yield* Ref.get(position))
+        yield* Ref.set(shownPaused, yield* Ref.get(paused))
+      }
+
+      const index = yield* Ref.get(shownPosition)
+
+      return { item: queue[index % queue.length] ?? null, isPaused: yield* Ref.get(shownPaused) }
     })
 
-    const skipToNext = Effect.gen(function* () {
-      yield* Ref.update(position, (index) => index + 1)
-      yield* Ref.set(staleLeft, staleReads)
-    })
+    const command = (change: Effect.Effect<void>) =>
+      change.pipe(Effect.andThen(Ref.set(staleLeft, staleReads)))
+
+    const skipToNext = command(Ref.update(position, (index) => index + 1))
 
     const level = yield* Ref.make(1)
 
@@ -49,8 +65,8 @@ export const FakeBridge = (staleReads: number) => Layer.effect(
     const handlers = new Map<string, (args: ReadonlyArray<Schema.Json>) => Effect.Effect<unknown>>([
       ["PlayerAPI.getState", () => getState],
       ["PlayerAPI.skipToNext", () => skipToNext],
-      ["PlayerAPI.pause", () => Ref.set(paused, true)],
-      ["PlayerAPI.resume", () => Ref.set(paused, false)],
+      ["PlayerAPI.pause", () => command(Ref.set(paused, true))],
+      ["PlayerAPI.resume", () => command(Ref.set(paused, false))],
       ["PlaybackAPI.getVolume", () => Ref.get(level)],
       ["PlaybackAPI.setVolume", setVolume]
     ])

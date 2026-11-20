@@ -1,16 +1,18 @@
 import { Context, Effect, Layer, Schedule, Schema } from "effect"
 import { Bridge } from "../bridge/Bridge.ts"
 import { InternalApiChanged, type SpotifyError } from "../domain/errors.ts"
+import { PlayerStatus } from "../domain/PlayerStatus.ts"
 import { SpotifyUri, Track } from "../domain/Track.ts"
 import { Volume } from "../domain/Volume.ts"
 
-// The shape PlayerAPI.getState() returns inside Spotify.
+// The shape PlayerAPI.getState() returns inside Spotify. Spotify's own
+// UI treats `item` as possibly missing, so we do too.
 const RawState = Schema.Struct({
-  item: Schema.Struct({
+  item: Schema.optional(Schema.NullOr(Schema.Struct({
     uri: SpotifyUri,
     name: Schema.String,
     artists: Schema.Array(Schema.Struct({ name: Schema.String }))
-  }),
+  }))),
   isPaused: Schema.Boolean
 })
 
@@ -30,18 +32,19 @@ const blameUpdate = (operation: string) =>
       )
     )
 
-const toTrack =(raw: typeof RawState.Type) =>
-  new Track({
-    uri: raw.item.uri,
-    name: raw.item.name,
-    artists: raw.item.artists.map((artist) => artist.name)
+const toStatus = ({ item, isPaused }: typeof RawState.Type) =>
+  new PlayerStatus({
+    track: item
+      ? new Track({ uri: item.uri, name: item.name, artists: item.artists.map((artist) => artist.name) })
+      : null,
+    paused: isPaused
   })
 
 export class Spotify extends Context.Service<Spotify, {
-  readonly nowPlaying: Effect.Effect<Track, SpotifyError>
-  readonly next: Effect.Effect<Track, SpotifyError>
-  readonly pause: Effect.Effect<void, SpotifyError>
-  readonly resume: Effect.Effect<void, SpotifyError>
+  readonly status: Effect.Effect<PlayerStatus, SpotifyError>
+  readonly next: Effect.Effect<PlayerStatus, SpotifyError>
+  readonly pause: Effect.Effect<PlayerStatus, SpotifyError>
+  readonly resume: Effect.Effect<PlayerStatus, SpotifyError>
   readonly volume: Effect.Effect<Volume, SpotifyError>
   readonly setVolume: (level: Volume) => Effect.Effect<void, SpotifyError>
 }>()("spotr/Spotify") {
@@ -50,32 +53,33 @@ export class Spotify extends Context.Service<Spotify, {
     Effect.gen(function* () {
       const bridge = yield* Bridge
 
-      const nowPlaying = bridge.call("PlayerAPI", "getState").pipe(
+      const status = bridge.call("PlayerAPI", "getState").pipe(
         Effect.flatMap(decodeState),
-        Effect.map(toTrack),
+        Effect.map(toStatus),
         blameUpdate("PlayerAPI.getState")
       )
 
-      // Spotify reports the old track for a moment after skipping, so
-      // poll until it changes. Give up after about two seconds, because
-      // repeat-one or the end of the queue keeps the same track.
+      // Spotify reports the old state for a moment after a command, so
+      // poll until it shows the change. Give up after about two seconds
+      // and return what it says then, e.g. repeat-one keeps the track.
+      const settle = (done: (status: PlayerStatus) => boolean) =>
+        status.pipe(Effect.repeat({ until: done, schedule: Schedule.spaced("100 millis"), times: 20 }))
+
       const next = Effect.gen(function* () {
-        const before = yield* nowPlaying
+        const before = yield* status
 
         yield* bridge.call("PlayerAPI", "skipToNext")
 
-        return yield* nowPlaying.pipe(
-          Effect.repeat({
-            until: (track) => track.uri !== before.uri,
-            schedule: Schedule.spaced("100 millis"),
-            times: 20
-          })
-        )
+        return yield* settle((now) => now.track?.uri !== before.track?.uri)
       })
 
-      const pause = bridge.call("PlayerAPI", "pause").pipe(Effect.asVoid)
+      const pause = bridge.call("PlayerAPI", "pause").pipe(
+        Effect.andThen(settle((now) => now.paused))
+      )
 
-      const resume = bridge.call("PlayerAPI", "resume").pipe(Effect.asVoid)
+      const resume = bridge.call("PlayerAPI", "resume").pipe(
+        Effect.andThen(settle((now) => !now.paused))
+      )
 
       const volume = bridge.call("PlaybackAPI", "getVolume").pipe(
         Effect.flatMap(decodeLevel),
@@ -86,7 +90,7 @@ export class Spotify extends Context.Service<Spotify, {
       const setVolume = (level: Volume) =>
         bridge.call("PlaybackAPI", "setVolume", level / 100).pipe(Effect.asVoid)
 
-      return { nowPlaying, next, pause, resume, volume, setVolume }
+      return { status, next, pause, resume, volume, setVolume }
     })
   )
 }
