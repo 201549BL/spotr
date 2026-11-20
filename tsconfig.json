@@ -1,0 +1,57 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "floatingEffect": "error",
+          "schemaNumber": "error",
+          "schemaClassMissingBrand": "error"
+        },
+        "allowedUnstableApis": [
+          "effect/cli",
+          "effect/http",
+          "effect/socket",
+          "@effect/platform-node"
+        ],
+        "overrides": [
+          {
+            "include": ["test/**/*.ts"],
+            "options": {
+              "allowedUnstableApis": [
+                "effect/cli",
+                "effect/http",
+                "effect/socket",
+                "@effect/platform-node",
+                "effect/testing",
+                "@effect/vitest",
+                "effect/FileSystem#layerNoop",
+                "effect/Path#layer",
+                "effect/Stdio#layerTest",
+                "effect/Terminal",
+                "effect/process/ChildProcessSpawner"
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "include": [
+    "src",
+    "test"
+  ]
+}
