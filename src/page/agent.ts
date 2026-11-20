@@ -5,8 +5,6 @@
 declare const opaque: unique symbol
 
 // Values owned by Spotify that the agent passes along without inspecting.
-type ModuleExport = { readonly [opaque]: "ModuleExport" }
-
 type InternalValue = { readonly [opaque]: "InternalValue" }
 
 type Json = null | number | boolean | string | ReadonlyArray<Json> | { readonly [key: string]: Json }
@@ -15,7 +13,14 @@ type InternalMethod = (...args: ReadonlyArray<Json>) => Promise<InternalValue | 
 
 type InternalApi = { readonly [method: string]: InternalMethod | undefined }
 
-type Registry = { readonly resolve: (token: ModuleExport) => InternalApi }
+// Spotify registers each API under a Symbol whose description is the
+// API's name, e.g. Symbol("PlayerAPI").
+type Token = { readonly description?: string | undefined }
+
+type Registry = {
+  readonly _map: ReadonlyMap<Token, InternalValue>
+  readonly resolve: (token: Token) => InternalApi
+}
 
 type Platform = { readonly getRegistry?: () => Registry }
 
@@ -24,10 +29,6 @@ type Fiber = {
   readonly sibling: Fiber | null
   readonly memoizedProps: { readonly value?: Platform } | null
 }
-
-type Require = (id: string) => Readonly<Record<string, ModuleExport>>
-
-type LoaderSlot = { require?: Require }
 
 export type DispatchResult =
   | { readonly ok: true; readonly value: InternalValue | null }
@@ -41,34 +42,13 @@ type Agent = {
 declare global {
   interface Window {
     __spotr?: Agent
-    rspackChunk?: Array<[ReadonlyArray<symbol>, Readonly<Record<string, never>>, (require: Require) => void]>
-    __webpack_modules__?: Readonly<Record<string, { toString(): string }>>
   }
 }
 
 export const installAgent = (): Agent => {
-  const version = 2
+  const version = 3
 
   if (window.__spotr?.version === version) return window.__spotr
-
-  // Spotify's bundler (rspack) exposes its module loader to any chunk
-  // pushed onto this array.
-  const captured: LoaderSlot = {}
-
-  window.rspackChunk?.push([[Symbol("spotr")], {}, (require) => { captured.require = require }])
-
-  // Each internal API is registered under a token created in a tiny
-  // module like `let r=(0,i(62359).u)("PlayerAPI")`.
-  const tokens = new Map<string, string>()
-
-  for (const [id, mod] of Object.entries(window.__webpack_modules__ ?? {})) {
-    const source = mod.toString()
-
-    if (source.length > 400) continue
-    const match = source.match(/\.u\)\("([A-Za-z]+)"\)/)
-
-    if (match?.[1]) tokens.set(match[1], id)
-  }
 
   // The object owning getRegistry() is passed down React's tree as a
   // context value, so walk the tree from the root element.
@@ -110,19 +90,10 @@ export const installAgent = (): Agent => {
   const registry = findPlatform()?.getRegistry?.()
 
   const resolveApi = (name: string) => {
-    const id = tokens.get(name)
+    if (!registry) return undefined
+    const token = [...registry._map.keys()].find((key) => key?.description === name)
 
-    if (!id || !captured.require || !registry) return undefined
-
-    for (const token of Object.values(captured.require(id))) {
-      try {
-        return registry.resolve(token)
-      } catch {
-        // This export wasn't the token; try the module's next export.
-      }
-    }
-
-    return undefined
+    return token ? registry.resolve(token) : undefined
   }
 
   const agent: Agent = {
