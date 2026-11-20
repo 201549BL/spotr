@@ -25,3 +25,16 @@ export class PlaylistAddResult extends Schema.Class<PlaylistAddResult, { readonl
   uri: SpotifyUri,
   name: Schema.NullOr(Schema.String)
 }) {}
+
+// A playlist spotr just created. `public` is whether it shows on the
+// user's profile, as Spotify reports it after creating.
+export class CreatedPlaylist extends Schema.Class<CreatedPlaylist, { readonly brand: unique symbol }>("CreatedPlaylist")({
+  uri: SpotifyUri,
+  name: Schema.String,
+  public: Schema.Boolean
+}) {}
+
+export class DeletedPlaylist extends Schema.Class<DeletedPlaylist, { readonly brand: unique symbol }>("DeletedPlaylist")({
+  uri: SpotifyUri,
+  name: Schema.String
+}) {}

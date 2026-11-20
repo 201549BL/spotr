@@ -2,9 +2,15 @@ import { Clock, Context, Effect, Layer, Schedule, type Schema, Stream } from "ef
 import { Bridge } from "../bridge/Bridge.ts"
 import { Check } from "../domain/Check.ts"
 import type { Device } from "../domain/Device.ts"
-import { NotFound, type SpotifyError } from "../domain/errors.ts"
+import { NeedsConfirmation, NotFound, type SpotifyError, SpotifyRefused } from "../domain/errors.ts"
 import type { PlayerStatus, Repeat } from "../domain/PlayerStatus.ts"
-import { LikeResult, type Playlist, PlaylistAddResult } from "../domain/Playlist.ts"
+import {
+  CreatedPlaylist,
+  DeletedPlaylist,
+  LikeResult,
+  type Playlist,
+  PlaylistAddResult
+} from "../domain/Playlist.ts"
 import { Queue } from "../domain/Queue.ts"
 import type { SeekTarget } from "../domain/Seek.ts"
 import type { SpotifyUri } from "../domain/Track.ts"
@@ -12,6 +18,8 @@ import type { Volume } from "../domain/Volume.ts"
 import {
   blameUpdate,
   decodeContains,
+  decodeCreated,
+  decodePublished,
   decodeDevices,
   decodeLevel,
   decodeQueue,
@@ -45,7 +53,7 @@ const uses = {
   ],
   PlaybackAPI: ["getVolume", "setVolume"],
   LibraryAPI: ["add", "remove", "contains"],
-  RootlistAPI: ["getContents"],
+  RootlistAPI: ["getContents", "contains", "createPlaylist", "remove", "setPublishedState", "getPublishedState"],
   PlaylistAPI: ["add"],
   ConnectDevicesAPI: ["getDevices"],
   ConnectTransferAPI: ["transferPlayback"]
@@ -81,6 +89,8 @@ export class Spotify extends Context.Service<Spotify, {
     playlist: string,
     uri: SpotifyUri | undefined
   ) => Effect.Effect<PlaylistAddResult, SpotifyError>
+  readonly createPlaylist: (name: string, isPrivate: boolean) => Effect.Effect<CreatedPlaylist, SpotifyError>
+  readonly deletePlaylist: (playlist: string, confirmed: boolean) => Effect.Effect<DeletedPlaylist, SpotifyError>
   readonly devices: Effect.Effect<ReadonlyArray<Device>, SpotifyError>
   readonly useDevice: (device: string) => Effect.Effect<ReadonlyArray<Device>, SpotifyError>
   readonly volume: Effect.Effect<Volume, SpotifyError>
@@ -297,6 +307,69 @@ export class Spotify extends Context.Service<Spotify, {
           return new PlaylistAddResult({ playlist: found, ...track })
         })
 
+      const isPublished = (uri: SpotifyUri) =>
+        call("RootlistAPI", "getPublishedState", uri).pipe(
+          Effect.flatMap(decodePublished),
+          blameUpdate("RootlistAPI.getPublishedState")
+        )
+
+      // RootlistAPI.contains takes an array, unlike LibraryAPI.contains.
+      const inSidebar = (uri: SpotifyUri) =>
+        call("RootlistAPI", "contains", [uri]).pipe(
+          Effect.flatMap(decodeContains),
+          Effect.map(([found]) => found === true),
+          blameUpdate("RootlistAPI.contains")
+        )
+
+      // Spotify puts new playlists at the top of the sidebar. "Private"
+      // means not published on the user's profile.
+      const createPlaylist = (name: string, isPrivate: boolean) =>
+        Effect.gen(function* () {
+          const uri = yield* call("RootlistAPI", "createPlaylist", name, { before: "start" }, {}).pipe(
+            Effect.flatMap(decodeCreated),
+            blameUpdate("RootlistAPI.createPlaylist")
+          )
+
+          if (!uri) return yield* new SpotifyRefused({ action: `create the playlist "${name}"` })
+
+          if (isPrivate) yield* call("RootlistAPI", "setPublishedState", uri, false)
+
+          const published = yield* pollUntil(isPublished(uri), (value) => !isPrivate || !value)
+
+          if (isPrivate && published) return yield* new SpotifyRefused({ action: `make "${name}" private` })
+
+          return new CreatedPlaylist({ uri, name, public: published })
+        })
+
+      // `playlist` is a URI, or a name matched without regard to case.
+      // Spotify's remove reports no errors, so check the playlist left
+      // the sidebar.
+      const deletePlaylist = (playlist: string, confirmed: boolean) =>
+        Effect.gen(function* () {
+          const all = yield* playlists
+          const matches = all.filter((candidate) => candidate.uri === playlist || candidate.name.toLowerCase() === playlist.toLowerCase())
+          const [found] = matches
+
+          if (!found || matches.length > 1) {
+            return yield* new NotFound({
+              what: matches.length > 1 ? `A single playlist named "${playlist}"` : `Playlist "${playlist}"`,
+              hint: matches.length > 1
+                ? "Several playlists share that name. Pass its URI from spotr playlist ls."
+                : "Run spotr playlist ls to see your playlists."
+            })
+          }
+
+          if (!confirmed) return yield* new NeedsConfirmation({ action: `delete "${found.name}"` })
+
+          yield* call("RootlistAPI", "remove", [{ uri: found.uri }])
+
+          if (yield* pollUntil(inSidebar(found.uri), (present) => !present)) {
+            return yield* new SpotifyRefused({ action: `delete "${found.name}"` })
+          }
+
+          return new DeletedPlaylist({ uri: found.uri, name: found.name })
+        })
+
       // ConnectDevicesAPI and ConnectTransferAPI exist from startup.
       // ConnectAPI would do the same job, but creating it starts a
       // device search on the local network.
@@ -394,6 +467,8 @@ export class Spotify extends Context.Service<Spotify, {
         unlike: setLiked(false),
         playlists,
         addToPlaylist,
+        createPlaylist,
+        deletePlaylist,
         devices,
         useDevice,
         volume,

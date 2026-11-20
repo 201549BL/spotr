@@ -138,13 +138,6 @@ export class LaunchFailed extends Schema.TaggedError<
   }
 }
 
-export type SpotifyError =
-  | BridgeError
-  | InternalApiChanged
-  | NotFound
-  | SpotifyWithoutDebugPort
-  | LaunchFailed
-
 // doctor already printed which checks failed, so this only sets the exit
 // code.
 export class ChecksFailed extends Schema.TaggedError<
@@ -156,3 +149,59 @@ export class ChecksFailed extends Schema.TaggedError<
   readonly [Runtime.errorExitCode] = 6
   readonly [Runtime.errorReported] = false
 }
+
+// Spotify accepted the request but didn't do it. Several of its methods
+// report failure this way instead of throwing.
+export class SpotifyRefused extends Schema.TaggedError<
+  SpotifyRefused,
+  { readonly brand: unique symbol }
+>()("SpotifyRefused", {
+  action: Schema.String
+}) {
+  readonly [Runtime.errorExitCode] = 7
+  readonly [Runtime.errorReported] = false
+
+  get message() {
+    return `Spotify didn't ${this.action}`
+  }
+
+  get hint() {
+    return "Check that Spotify is online and signed in, then try again."
+  }
+
+  get detail() {
+    return "Spotify reported no error, but the change didn't happen"
+  }
+}
+
+// Deleting needs an explicit --yes, so a typo can't remove a playlist.
+export class NeedsConfirmation extends Schema.TaggedError<
+  NeedsConfirmation,
+  { readonly brand: unique symbol }
+>()("NeedsConfirmation", {
+  action: Schema.String
+}) {
+  readonly [Runtime.errorExitCode] = 2
+  readonly [Runtime.errorReported] = false
+
+  get message() {
+    return `spotr won't ${this.action} without --yes`
+  }
+
+  get hint() {
+    return "Run the command again with --yes if you're sure."
+  }
+
+  get detail() {
+    return "Deleted playlists can only be recovered at spotify.com/account/recover-playlists"
+  }
+}
+
+export type SpotifyError =
+  | BridgeError
+  | InternalApiChanged
+  | NotFound
+  | SpotifyWithoutDebugPort
+  | LaunchFailed
+  | SpotifyRefused
+  | NeedsConfirmation

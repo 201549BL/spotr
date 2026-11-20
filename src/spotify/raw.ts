@@ -141,6 +141,12 @@ export const toPlaylists = (folder: RawFolder, path: ReadonlyArray<string> = [])
 
 export const decodeContains = Schema.decodeUnknownEffect(Schema.Array(Schema.Boolean))
 
+// RootlistAPI.createPlaylist resolves to the new URI, or null when it
+// failed.
+export const decodeCreated = Schema.decodeUnknownEffect(Schema.NullOr(SpotifyUri))
+
+export const decodePublished = Schema.decodeUnknownEffect(Schema.Boolean)
+
 // ConnectDevicesAPI.getDevices(): Spotify Connect devices, this computer
 // included.
 const RawDevices = Schema.Array(Schema.Struct({

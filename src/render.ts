@@ -3,7 +3,13 @@ import type { Check } from "./domain/Check.ts"
 import type { Device } from "./domain/Device.ts"
 import type { SpotifyError } from "./domain/errors.ts"
 import type { PlayerStatus } from "./domain/PlayerStatus.ts"
-import type { LikeResult, Playlist, PlaylistAddResult } from "./domain/Playlist.ts"
+import type {
+  CreatedPlaylist,
+  DeletedPlaylist,
+  LikeResult,
+  Playlist,
+  PlaylistAddResult
+} from "./domain/Playlist.ts"
 import type { Queue } from "./domain/Queue.ts"
 import type { Track } from "./domain/Track.ts"
 import { formatTime } from "./domain/Seek.ts"
@@ -89,6 +95,11 @@ export const playlistsText = (playlists: ReadonlyArray<Playlist>) =>
         return `${name} · ${tracks}${playlist.canAdd ? "" : " · read-only"}`
       })
       .join("\n")
+
+export const createdText = ({ name, public: isPublic }: CreatedPlaylist) =>
+  `Created "${name}" (${isPublic ? "public" : "private"})`
+
+export const deletedText = ({ name }: DeletedPlaylist) => `Deleted "${name}"`
 
 export const playlistAddText = ({ playlist, uri, name }: PlaylistAddResult) =>
   `Added ${name ?? uri} to ${playlist.name}`

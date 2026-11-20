@@ -64,7 +64,7 @@ describe("doctor", () => {
         "pass PlayerAPI has the 13 methods spotr uses",
         "pass PlaybackAPI has the 2 methods spotr uses",
         "pass LibraryAPI has the 3 methods spotr uses",
-        "pass RootlistAPI has the method spotr uses",
+        "pass RootlistAPI has the 6 methods spotr uses",
         "pass PlaylistAPI has the method spotr uses",
         "pass ConnectDevicesAPI has the method spotr uses",
         "pass ConnectTransferAPI has the method spotr uses"

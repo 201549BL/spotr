@@ -55,11 +55,15 @@ While the port is open, other programs on this computer can control Spotify too.
 | `spotr like [uri]` / `spotr unlike [uri]` | Add or remove a track in Liked Songs. Defaults to the playing track |
 | `spotr playlist ls` | List your playlists |
 | `spotr playlist add <name\|uri> [uri]` | Add a track to a playlist. Defaults to the playing track |
+| `spotr playlist create <name> [--private]` | Create a playlist. `--private` keeps it off your public profile |
+| `spotr playlist delete <name\|uri> --yes` | Delete a playlist. Without `--yes` it refuses |
 | `spotr devices` | List Spotify Connect devices |
 | `spotr devices use <name\|id>` | Move playback to another device |
 | `spotr watch` | Print a line whenever the track or play state changes. Ctrl+C stops |
 | `spotr launch` | Start Spotify with its DevTools port open |
 | `spotr doctor` | Check that spotr can reach and drive Spotify |
+
+A deleted playlist can be recovered for a while at spotify.com/account/recover-playlists.
 
 Wherever a command takes a URI, you can also paste an `open.spotify.com` link.
 
@@ -71,10 +75,12 @@ Every command accepts `--json` for machine-readable output, and `--port` (or `SP
 | --- | --- |
 | 0 | Success |
 | 1 | Bad arguments |
+| 2 | A command needs `--yes` to go ahead |
 | 3 | Spotify isn't reachable, or didn't answer in time |
 | 4 | Spotify returned something unexpected. It has probably updated |
 | 5 | A track, playlist or device wasn't found |
 | 6 | `doctor` found a problem |
+| 7 | Spotify accepted the request but didn't carry it out |
 | 130 | Stopped with Ctrl+C |
 
 ## Development

@@ -48,13 +48,21 @@ type SampleFolder = {
   readonly items: ReadonlyArray<SampleFolder | SamplePlaylist | { readonly type: "placeholder"; readonly uri: string }>
 }
 
-const samplePlaylist = (id: number, name: string, canAdd: boolean, totalLength: number): SamplePlaylist => ({
+const samplePlaylist = (
+  id: number,
+  name: string,
+  canAdd: boolean,
+  totalLength: number,
+  uri = `spotify:playlist:${String(id).repeat(22)}`
+): SamplePlaylist => ({
   type: "playlist",
-  uri: `spotify:playlist:${String(id).repeat(22)}`,
+  uri,
   name,
   canAdd,
   totalLength
 })
+
+const stuckPlaylist = "spotify:playlist:3333333333333333333333"
 
 // The playlist sidebar: a folder, a playlist the user can't add to, two
 // playlists that share a name, and a playlist Spotify couldn't load.
@@ -97,6 +105,9 @@ type PlayerState = {
   readonly uids: number
   readonly liked: ReadonlyArray<string>
   readonly playlistAdds: ReadonlyArray<string>
+  readonly created: ReadonlyArray<SamplePlaylist>
+  readonly removed: ReadonlyArray<string>
+  readonly unpublished: ReadonlyArray<string>
   readonly activeDevice: string
   readonly transfers: number
 }
@@ -123,6 +134,9 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
       uids: 0,
       liked: [],
       playlistAdds: [],
+      created: [],
+      removed: [],
+      unpublished: [],
       activeDevice: "local_device",
       transfers: 0
     }
@@ -255,22 +269,86 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
       )
 
     // Each add grows that playlist's track count, so tests can see it.
+    // Created playlists sit at the top, and removed ones are gone.
     const rootlist = Ref.get(state).pipe(
       Effect.map((current) => {
-        const grow = (folder: SampleFolder): SampleFolder => ({
+        const live = (folder: SampleFolder): SampleFolder => ({
           ...folder,
-          items: folder.items.map((item) => {
-            if (item.type === "folder") return grow(item)
+          items: folder.items.flatMap((item): ReadonlyArray<SampleFolder["items"][number]> => {
+            if (item.type === "folder") return [live(item)]
 
-            if (item.type === "placeholder") return item
+            if (current.removed.includes(item.uri)) return []
 
-            return { ...item, totalLength: item.totalLength + current.playlistAdds.filter((uri) => uri === item.uri).length }
+            if (item.type === "placeholder") return [item]
+
+            return [{ ...item, totalLength: item.totalLength + current.playlistAdds.filter((uri) => uri === item.uri).length }]
           })
         })
 
-        return grow(sampleRootlist)
+        return live({ ...sampleRootlist, items: [...current.created, ...sampleRootlist.items] })
       })
     )
+
+    // Like Spotify, an unusable name yields null instead of an error.
+    const createPlaylist = (args: ReadonlyArray<Schema.Json>) =>
+      decodeArgs(Schema.Tuple([Schema.String, Schema.Struct({ before: Schema.Literal("start") }), Schema.Unknown]))(args).pipe(
+        Effect.orDie,
+        Effect.flatMap(([name]) =>
+          Ref.modify(state, (current) => {
+            if (name === "refuse me") return [null, current]
+
+            const uri = `spotify:playlist:created${current.created.length}`.padEnd(39, "0")
+
+            return [uri, { ...current, created: [samplePlaylist(0, name, true, 0, uri), ...current.created] }]
+          })
+        )
+      )
+
+    const setPublishedState = (args: ReadonlyArray<Schema.Json>) =>
+      decodeArgs(Schema.Tuple([Schema.String, Schema.Boolean]))(args).pipe(
+        Effect.orDie,
+        Effect.flatMap(([uri, published]) =>
+          Ref.update(state, (current) => ({
+            ...current,
+            unpublished: published ? current.unpublished.filter((other) => other !== uri) : [...current.unpublished, uri]
+          }))
+        )
+      )
+
+    const getPublishedState = (args: ReadonlyArray<Schema.Json>) =>
+      decodeArgs(Schema.Tuple([Schema.String]))(args).pipe(
+        Effect.orDie,
+        Effect.flatMap(([uri]) => Ref.get(state).pipe(Effect.map((current) => !current.unpublished.includes(uri))))
+      )
+
+    const sidebarUris = rootlist.pipe(
+      Effect.map((root) => {
+        const uris = (folder: SampleFolder): ReadonlyArray<string> =>
+          folder.items.flatMap((item) => item.type === "folder" ? uris(item) : [item.uri])
+
+        return uris(root)
+      })
+    )
+
+    // RootlistAPI.contains takes an array of URIs.
+    const rootlistContains = (args: ReadonlyArray<Schema.Json>) =>
+      decodeArgs(Schema.Tuple([Schema.Array(Schema.String)]))(args).pipe(
+        Effect.orDie,
+        Effect.flatMap(([uris]) => sidebarUris.pipe(Effect.map((present) => uris.map((uri) => present.includes(uri)))))
+      )
+
+    // Like Spotify, remove reports nothing. This fake quietly keeps
+    // "Someone's Mix", so tests can see a removal that didn't happen.
+    const removeFromRootlist = (args: ReadonlyArray<Schema.Json>) =>
+      decodeArgs(Schema.Tuple([Schema.Array(Schema.Struct({ uri: Schema.String }))]))(args).pipe(
+        Effect.orDie,
+        Effect.flatMap(([items]) =>
+          Ref.update(state, (current) => ({
+            ...current,
+            removed: [...current.removed, ...items.flatMap(({ uri }) => uri === stuckPlaylist ? [] : [uri])]
+          }))
+        )
+      )
 
     const addToPlaylist = (args: ReadonlyArray<Schema.Json>) =>
       decodeArgs(Schema.Tuple([Schema.String, Schema.Array(Schema.String), Schema.Struct({ after: Schema.Literal("end") }), Schema.Unknown]))(args).pipe(
@@ -322,6 +400,11 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
       ["LibraryAPI.remove", setLiked(false)],
       ["LibraryAPI.contains", contains],
       ["RootlistAPI.getContents", () => rootlist],
+      ["RootlistAPI.contains", rootlistContains],
+      ["RootlistAPI.createPlaylist", createPlaylist],
+      ["RootlistAPI.remove", removeFromRootlist],
+      ["RootlistAPI.setPublishedState", setPublishedState],
+      ["RootlistAPI.getPublishedState", getPublishedState],
       ["PlaylistAPI.add", addToPlaylist],
       ["ConnectDevicesAPI.getDevices", () => getDevices],
       ["ConnectTransferAPI.transferPlayback", transferPlayback],

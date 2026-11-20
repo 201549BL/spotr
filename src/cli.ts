@@ -1,5 +1,5 @@
-import { Effect, Layer, Option } from "effect"
-import { Argument, Command } from "effect/cli"
+import { Effect, Layer, Option, Schema } from "effect"
+import { Argument, Command, Flag } from "effect/cli"
 import { FetchHttpClient } from "effect/http"
 import { Socket } from "effect/socket"
 import { CdpBridge } from "./bridge/CdpBridge.ts"
@@ -8,6 +8,8 @@ import { parseSeek } from "./domain/Seek.ts"
 import { SpotifyUri, toSpotifyUri } from "./domain/Track.ts"
 import { Volume } from "./domain/Volume.ts"
 import {
+  createdText,
+  deletedText,
   devicesText,
   doctorText,
   launchText,
@@ -139,9 +141,36 @@ const playlistAdd = Command.make(
     )
 ).pipe(Command.withDescription("Add a track to one of your playlists"))
 
+const playlistCreate = Command.make(
+  "create",
+  {
+    name: Argument.String("name").pipe(
+      Argument.withDescription("The new playlist's name"),
+      Argument.map((name) => name.trim()),
+      Argument.withSchema(Schema.String.check(Schema.isNonEmpty()))
+    ),
+    isPrivate: Flag.Boolean("private").pipe(
+      Flag.withDescription("Keep it off your public profile"),
+      Flag.withDefault(false)
+    )
+  },
+  ({ name, isPrivate }) =>
+    Spotify.use((spotify) => spotify.createPlaylist(name, isPrivate)).pipe(present(createdText))
+).pipe(Command.withDescription("Create a playlist at the top of your library"))
+
+const playlistDelete = Command.make(
+  "delete",
+  {
+    playlist: Argument.String("playlist").pipe(Argument.withDescription("The playlist's name or URI")),
+    yes: Flag.Boolean("yes").pipe(Flag.withDescription("Confirm the deletion"), Flag.withDefault(false))
+  },
+  ({ playlist, yes }) =>
+    Spotify.use((spotify) => spotify.deletePlaylist(playlist, yes)).pipe(present(deletedText))
+).pipe(Command.withDescription("Delete one of your playlists. Needs --yes"))
+
 const playlist = Command.make("playlist").pipe(
-  Command.withSubcommands([playlistList, playlistAdd]),
-  Command.withDescription("List your playlists, or add a track to one")
+  Command.withSubcommands([playlistList, playlistAdd, playlistCreate, playlistDelete]),
+  Command.withDescription("List, create, delete or add to your playlists")
 )
 
 const devicesUse = Command.make(
