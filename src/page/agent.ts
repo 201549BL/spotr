@@ -41,7 +41,7 @@ export type DispatchResult = { readonly ok: true; readonly value: InternalValue 
 // The methods of `methods` that the API lacks. Nothing is called.
 export type InspectResult = { readonly ok: true; readonly value: ReadonlyArray<string> } | Failure
 
-type Agent = {
+export type Agent = {
   readonly version: number
   readonly dispatch: (api: string, method: string, args: ReadonlyArray<Json>) => Promise<DispatchResult>
   readonly inspect: (api: string, methods: ReadonlyArray<string>) => InspectResult

@@ -15,27 +15,29 @@ Run from `cli/`.
 
 ## Layout
 
-spotr is being rebuilt one concept at a time so its owner can learn Effect. Add a folder only when the current step needs it, and don't jump ahead. The finished design (spotify/, domain/, bridge/, page/, test/) is committed on branch `worktree-agent-a1982c5e57f983af7` for reference.
-
 - `src/main.ts` is the entry point and the only place a runtime is created.
 - `src/cli.ts` holds the command tree and the layer wiring.
 - `src/render.ts` turns command results and errors into text or JSON.
 - `src/settings.ts` defines the global `--json` and `--port` settings.
-- `src/domain/` holds the Schema models and tagged errors.
-- `src/spotify/Spotify.ts` is the service commands use. It decodes Spotify's raw data into domain types.
+- `src/domain/` holds the Schema models, tagged errors, and pure helpers such as seek parsing.
+- `src/spotify/Spotify.ts` is the service commands use. Its `uses` table lists every internal method spotr calls. `call` is typed against it, and `doctor` checks it.
+- `src/spotify/raw.ts` holds the shapes Spotify's internal APIs return, and turns them into domain types.
+- `src/spotify/Launcher.ts` starts the Spotify app with the DevTools port open, through `effect/process`.
 - `src/bridge/` is the seam to Spotify. `Bridge.ts` is the interface, `CdpBridge.ts` and `Cdp.ts` reach the real app, and `FakeBridge.ts` stands in for it in tests.
 - `src/page/agent.ts` runs inside Spotify's page. It is sent as source text, so its function body must be self-contained.
-- `test/` holds Vitest tests, which run `Spotify` on `FakeBridge`.
+- `test/` holds Vitest tests. Most run `Spotify` on `FakeBridge`. `agent.test.ts` runs the agent from its source text against a fake page.
 - `tools/oxlint/anti-slop/` is vendored. See its `UPSTREAM.md` before changing it.
-
-The rules below describe the finished design. Rules for pieces that don't exist yet apply once they're added.
 
 ## Rules
 
 - Verify every Effect API against the JSDoc in `node_modules/effect/src` before using it. The installed source is the v4 truth. v3 names from memory, such as `Context.Tag`, `@effect/cli` and `catchAll`, are wrong here.
-- Every command returns data and pipes it through `present(toText)` from `src/render.ts`, which prints the result or the error as text or JSON. Printing happens inside commands because the `--json` setting only exists in command context.
-- Each error class carries its own exit code as `[Runtime.errorExitCode]`, with `[Runtime.errorReported] = false` so the runtime does not log it again.
+- Every command returns data and pipes it through `present(toText)` (or `presentEach` for a stream) from `src/render.ts`, which prints the result or the error as text or JSON. Printing happens inside commands because the `--json` setting only exists in command context.
+- Each error class carries its own exit code as `[Runtime.errorExitCode]`, with `[Runtime.errorReported] = false` so the runtime does not log it again. The codes are listed in `README.md`.
 - `Flag.Boolean` needs `Flag.withDefault(false)`, or the flag becomes required.
-- `src/page/` never imports Effect. `src/page/registry.ts` is the only file that knows Spotify internals.
-- Commands depend on `Spotify`, never on `Bridge` directly.
+- `src/page/` never imports Effect. Bump the agent's `version` whenever `agent.ts` changes, or Spotify keeps running the old copy.
+- Commands depend on `Spotify` (and `Launcher`), never on `Bridge` directly.
+- Decode everything Spotify returns with Schema in `raw.ts`, and turn decode failures into `InternalApiChanged` with `blameUpdate`.
+- After a command, Spotify reports the old state for a moment. Wait for the change with `settle` or `pollUntil` in `Spotify.ts`.
+- `FakeBridge` mirrors the real shapes. When `Spotify` starts calling a new method, add a handler that behaves like Spotify's, including its quirks.
+- Tests and fixtures use placeholder tracks, playlists and devices. Never commit data from a real Spotify account.
 - Fix lint and Effect diagnostics in the code. Do not suppress them or lower their severity.
