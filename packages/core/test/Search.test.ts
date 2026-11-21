@@ -1,12 +1,13 @@
 import { assert, describe, it } from "@effect/vitest"
-import { type Duration, Effect, Fiber, Layer } from "effect"
+import { type Duration, Effect, Fiber } from "effect"
 import { TestClock } from "effect/testing"
 import { FakeBridge, sampleQueue } from "../src/locator/FakeBridge.ts"
 import { relevant, SearchResult } from "../src/model/SearchResult.ts"
 import { SpotifyUri, toPlayTarget } from "../src/model/Track.ts"
-import { Spotify } from "../src/api/Spotify.ts"
+import { Client } from "../src/api/Client.ts"
+import { core } from "./core.ts"
 
-const TestSpotify = Spotify.layer.pipe(Layer.provide(FakeBridge(sampleQueue, 0)))
+const TestSpotify = core(FakeBridge(sampleQueue, 0))
 
 const withTime = <A, E>(self: Effect.Effect<A, E>, time: Duration.Input) =>
   Effect.gen(function* () {
@@ -22,36 +23,36 @@ const line = ({ kind, name, by }: SearchResult) => `${kind} ${name}${by ? ` by $
 describe("search", () => {
   it.effect("returns hits best first, and skips types spotrc doesn't know", () =>
     Effect.gen(function* () {
-      const spotify = yield* Spotify
+      const client = yield* Client
 
-      assert.deepStrictEqual((yield* spotify.search("song", 10)).map(line), [
+      assert.deepStrictEqual((yield* client.search({ text: "song", limit: 10 })).map(line), [
         "track First Song by Some Artist",
         "playlist Road Trip Songs by Someone",
         "genre Song Genre",
         "playlist Popular Right Now by Spotify"
       ])
-      assert.deepStrictEqual((yield* spotify.search("some artist", 2)).map(line), [
+      assert.deepStrictEqual((yield* client.search({ text: "some artist", limit: 2 })).map(line), [
         "track First Song by Some Artist",
         "album Sample Album by Some Artist"
       ])
-      assert.deepStrictEqual((yield* spotify.search("nothing like this", 10)).map(line), ["playlist Popular Right Now by Spotify"])
+      assert.deepStrictEqual((yield* client.search({ text: "nothing like this", limit: 10 })).map(line), ["playlist Popular Right Now by Spotify"])
     }).pipe(Effect.provide(TestSpotify)))
 
   it.effect("play by search plays the first hit that can be played", () =>
     Effect.gen(function* () {
-      const spotify = yield* Spotify
+      const client = yield* Client
 
-      yield* withTime(spotify.pause, "300 millis")
-      const status = yield* withTime(spotify.playSearch("sample album"), "300 millis")
+      yield* withTime(client.pause(), "300 millis")
+      const status = yield* withTime(client.play({ what: "sample album" }), "300 millis")
 
       assert.deepStrictEqual({ track: status.track?.name, paused: status.paused }, { track: "First Song", paused: false })
     }).pipe(Effect.provide(TestSpotify)))
 
   it.effect("play by search refuses when nothing playable matches", () =>
     Effect.gen(function* () {
-      const spotify = yield* Spotify
-      const nothing = yield* Effect.flip(spotify.playSearch("nothing like this"))
-      const genreOnly = yield* Effect.flip(spotify.playSearch("song genre"))
+      const client = yield* Client
+      const nothing = yield* Effect.flip(client.play({ what: "nothing like this" }))
+      const genreOnly = yield* Effect.flip(client.play({ what: "song genre" }))
 
       assert.deepStrictEqual([nothing.message, genreOnly.message], [
         "Anything playable for \"nothing like this\" wasn't found",

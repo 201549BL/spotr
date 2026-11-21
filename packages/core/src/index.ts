@@ -1,16 +1,16 @@
-export { Bridge } from "./locator/Bridge.ts"
+export { Client, fake, fakeOn, live } from "./api/Client.ts"
 
-export { CdpBridge } from "./locator/CdpBridge.ts"
+export { describe, type Operation, Spotrc } from "./api/operations.ts"
 
 export { FakeBridge, sampleQueue } from "./locator/FakeBridge.ts"
-
-export { defaultPort, DevToolsPort } from "./transport/DevToolsPort.ts"
 
 export { Check } from "./model/Check.ts"
 
 export { Device } from "./model/Device.ts"
 
 export * from "./model/errors.ts"
+
+export { LaunchResult } from "./model/LaunchResult.ts"
 
 export { PlayerStatus, Repeat } from "./model/PlayerStatus.ts"
 
@@ -26,10 +26,4 @@ export { likedSongs, type PlayTarget, SpotifyUri, toPlayTarget, toSpotifyUri, Tr
 
 export { parseVolumeChange, Volume, type VolumeChange, VolumeStatus } from "./model/Volume.ts"
 
-export { Client, fake, handlers, live } from "./api/handlers.ts"
-
-export { Launcher, LaunchResult } from "./transport/Launcher.ts"
-
-export { describe, type Operation, Spotrc } from "./api/operations.ts"
-
-export { Spotify } from "./api/Spotify.ts"
+export { defaultPort, DevToolsPort } from "./transport/DevToolsPort.ts"

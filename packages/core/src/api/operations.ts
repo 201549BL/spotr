@@ -10,7 +10,7 @@ import { SearchResult } from "../model/SearchResult.ts"
 import { SeekTarget } from "../model/Seek.ts"
 import { SpotifyUri } from "../model/Track.ts"
 import { VolumeChange, VolumeStatus } from "../model/Volume.ts"
-import { LaunchResult } from "../transport/Launcher.ts"
+import { LaunchResult } from "../model/LaunchResult.ts"
 
 const op = <const Tag extends string, Success extends Schema.Top, Payload extends Schema.Top | Schema.Struct.Fields = typeof Schema.Void>(
   tag: Tag,

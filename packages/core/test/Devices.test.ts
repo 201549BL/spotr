@@ -3,11 +3,12 @@ import { Effect, Layer, Schema } from "effect"
 import { Bridge } from "../src/locator/Bridge.ts"
 import { FakeBridge, sampleQueue } from "../src/locator/FakeBridge.ts"
 import type { Device } from "../src/model/Device.ts"
-import { Spotify } from "../src/api/Spotify.ts"
+import { Client } from "../src/api/Client.ts"
+import { core } from "./core.ts"
 
 const fake = FakeBridge(sampleQueue, 0)
 
-const TestSpotify = Layer.merge(Spotify.layer.pipe(Layer.provide(fake)), fake)
+const TestSpotify = Layer.merge(core(fake), fake)
 
 const active = (devices: ReadonlyArray<Device>) => devices.flatMap((device) => device.active ? [device.name] : [])
 
@@ -19,8 +20,8 @@ const transfers = Bridge.use((bridge) => bridge.call("Test", "transfers")).pipe(
 describe("devices", () => {
   it.effect("lists devices and marks the active one", () =>
     Effect.gen(function* () {
-      const spotify = yield* Spotify
-      const devices = yield* spotify.devices
+      const client = yield* Client
+      const devices = yield* client.devices()
 
       assert.deepStrictEqual(
         devices.map(({ name, type, active: isActive, local }) => ({ name, type, isActive, local })),
@@ -35,25 +36,25 @@ describe("devices", () => {
 
   it.effect("moves playback to a device found by name, ignoring case", () =>
     Effect.gen(function* () {
-      const spotify = yield* Spotify
+      const client = yield* Client
 
-      assert.deepStrictEqual(active(yield* spotify.useDevice("kitchen")), ["Kitchen"])
-      assert.deepStrictEqual(active(yield* spotify.useDevice("local_device")), ["This Mac"])
+      assert.deepStrictEqual(active(yield* client.useDevice({ device: "kitchen" })), ["Kitchen"])
+      assert.deepStrictEqual(active(yield* client.useDevice({ device: "local_device" })), ["This Mac"])
     }).pipe(Effect.provide(TestSpotify)))
 
   it.effect("does nothing when the device is already active", () =>
     Effect.gen(function* () {
-      const spotify = yield* Spotify
+      const client = yield* Client
 
-      assert.deepStrictEqual(active(yield* spotify.useDevice("This Mac")), ["This Mac"])
+      assert.deepStrictEqual(active(yield* client.useDevice({ device: "This Mac" })), ["This Mac"])
       assert.strictEqual(yield* transfers, 0)
     }).pipe(Effect.provide(TestSpotify)))
 
   it.effect("refuses unknown and shared device names", () =>
     Effect.gen(function* () {
-      const spotify = yield* Spotify
-      const missing = yield* Effect.flip(spotify.useDevice("Garage"))
-      const twins = yield* Effect.flip(spotify.useDevice("twin speaker"))
+      const client = yield* Client
+      const missing = yield* Effect.flip(client.useDevice({ device: "Garage" }))
+      const twins = yield* Effect.flip(client.useDevice({ device: "twin speaker" }))
 
       assert.deepStrictEqual([missing.message, twins.message], [
         "Device \"Garage\" wasn't found",

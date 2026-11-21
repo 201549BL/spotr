@@ -1,18 +1,8 @@
 import { Effect, Layer, Schema } from "effect"
-import { HttpClient, HttpClientResponse } from "effect/http"
-import { Socket } from "effect/socket"
-import { BridgeTimeout, ClientNotRunning, InternalApiChanged } from "../model/errors.ts"
+import { InternalApiChanged } from "../model/errors.ts"
 import { installAgent } from "./agent.ts"
-import { DevToolsPort } from "../transport/DevToolsPort.ts"
 import { Bridge } from "./Bridge.ts"
-import * as Cdp from "../transport/Cdp.ts"
-
-// What Chromium's DevTools endpoint lists at /json/list.
-const Targets = Schema.Array(Schema.Struct({
-  type: Schema.String,
-  url: Schema.String,
-  webSocketDebuggerUrl: Schema.String
-}))
+import { Page } from "../transport/Page.ts"
 
 const Failure = Schema.Struct({
   ok: Schema.Literal(false),
@@ -33,40 +23,15 @@ const decodeInspect = Schema.decodeUnknownEffect(Schema.Union([
 
 const AGENT_SOURCE = installAgent.toString()
 
+// The Bridge on the real Spotify: each call runs the page agent there.
 export const CdpBridge = Layer.effect(
   Bridge,
   Effect.gen(function* () {
-    const port = yield* DevToolsPort
-    const http = yield* HttpClient.HttpClient
-    const webSocket = yield* Socket.WebSocketConstructor
-
-    const findPage = http.get(`http://127.0.0.1:${port}/json/list`).pipe(
-      Effect.flatMap(HttpClientResponse.schemaBodyJson(Targets)),
-      Effect.mapError(() => new ClientNotRunning({ port, reason: "port" })),
-      Effect.flatMap((targets) => {
-        const page = targets.find((t) => t.type === "page" && t.url.includes("xpui"))
-
-        return page ? Effect.succeed(page) : Effect.fail(new ClientNotRunning({ port, reason: "page" }))
-      })
-    )
+    const page = yield* Page
 
     // Runs the agent with `use` appended, e.g. `.dispatch(...)`, and
     // returns what it resolves to.
-    const runAgent = (operation: string, use: string) =>
-      Effect.gen(function* () {
-        const page = yield* findPage
-
-        return yield* Cdp.evaluate(page.webSocketDebuggerUrl, `(${AGENT_SOURCE})()${use}`).pipe(
-          Effect.catchTag("SocketError", () => Effect.fail(new ClientNotRunning({ port, reason: "port" })))
-        )
-      }).pipe(
-        Effect.scoped,
-        Effect.provideService(Socket.WebSocketConstructor, webSocket),
-        Effect.timeoutOrElse({
-          duration: "5 seconds",
-          orElse: () => Effect.fail(new BridgeTimeout({ operation }))
-        })
-      )
+    const runAgent = (operation: string, use: string) => page.evaluate(operation, `(${AGENT_SOURCE})()${use}`)
 
     const params = (...values: ReadonlyArray<Schema.Json>) => values.map((value) => JSON.stringify(value)).join(", ")
 
@@ -114,4 +79,4 @@ export const CdpBridge = Layer.effect(
 
     return { call, inspect, graphql, inspectQueries }
   })
-)
+).pipe(Layer.provide(Page.layer))

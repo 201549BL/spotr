@@ -7,7 +7,10 @@ import { FakeBridge, sampleQueue } from "../src/locator/FakeBridge.ts"
 import { ClientNotRunning, InternalApiChanged } from "../src/model/errors.ts"
 import { DevToolsPort } from "../src/transport/DevToolsPort.ts"
 import { Launcher } from "../src/transport/Launcher.ts"
-import { Spotify } from "../src/api/Spotify.ts"
+import { Client } from "../src/api/Client.ts"
+import { handlers } from "../src/api/handlers.ts"
+import { Internals } from "../src/locator/Internals.ts"
+import { core } from "./core.ts"
 
 const withTime = <A, E>(self: Effect.Effect<A, E>, time: Duration.Input) =>
   Effect.gen(function* () {
@@ -21,13 +24,13 @@ const withTime = <A, E>(self: Effect.Effect<A, E>, time: Duration.Input) =>
 describe("watch", () => {
   it.effect("emits the status, then one line per change of track or play state", () =>
     Effect.gen(function* () {
-      const spotify = yield* Spotify
-      const fiber = yield* Effect.forkChild(Stream.runCollect(spotify.watch.pipe(Stream.take(3))))
+      const client = yield* Client
+      const fiber = yield* Effect.forkChild(Stream.runCollect(client.watch().pipe(Stream.take(3))))
 
       yield* TestClock.adjust("1 second")
-      yield* spotify.pause
+      yield* client.pause()
       yield* TestClock.adjust("2 seconds")
-      yield* spotify.next
+      yield* client.next()
       yield* TestClock.adjust("1 second")
 
       const seen = yield* Fiber.join(fiber)
@@ -36,7 +39,7 @@ describe("watch", () => {
         seen.map(({ track, paused }) => `${track?.name} ${paused ? "paused" : "playing"}`),
         ["First Song playing", "First Song paused", "Second Song paused"]
       )
-    }).pipe(Effect.provide(Spotify.layer.pipe(Layer.provide(FakeBridge(sampleQueue, 0))))))
+    }).pipe(Effect.provide(core(FakeBridge(sampleQueue, 0)))))
 })
 
 // A Bridge where `fail` decides how each inspected API answers.
@@ -49,9 +52,9 @@ const inspectingBridge = (fail: (api: string) => Effect.Effect<ReadonlyArray<str
   })
 
 const doctorWith = (bridge: Layer.Layer<Bridge>) =>
-  Spotify.use((spotify) => spotify.doctor).pipe(
+  Client.use((client) => client.doctor()).pipe(
     Effect.map((checks) => checks.map(({ name, status }) => `${status} ${name}`)),
-    Effect.provide(Spotify.layer.pipe(Layer.provide(bridge)))
+    Effect.provide(core(bridge))
   )
 
 describe("doctor", () => {
@@ -101,14 +104,14 @@ describe("doctor", () => {
 
   it.effect("names the API that lost a method or went missing", () =>
     Effect.gen(function* () {
-      const checks = yield* Spotify.use((spotify) => spotify.doctor).pipe(
-        Effect.provide(Spotify.layer.pipe(Layer.provide(inspectingBridge((api) => {
+      const checks = yield* Client.use((client) => client.doctor()).pipe(
+        Effect.provide(core(inspectingBridge((api) => {
           if (api === "LibraryAPI") return Effect.succeed(["contains"])
 
           if (api === "PlaylistAPI") return Effect.fail(new InternalApiChanged({ operation: api, issue: "ApiMissing: No internal API named PlaylistAPI" }))
 
           return Effect.succeed([])
-        }))))
+        })))
       )
 
       assert.deepStrictEqual(
@@ -154,12 +157,12 @@ const startsAfterOpen = (ran: Ref.Ref<ReadonlyArray<string>>) =>
   ).pipe(Layer.provide(FakeBridge(sampleQueue, 0)))
 
 const launchWith = (ran: Ref.Ref<ReadonlyArray<string>>, bridge: Layer.Layer<Bridge>, codes: (command: string) => number) =>
-  Launcher.use((launcher) => launcher.launch).pipe(
+  Client.use((client) => client.launch()).pipe(
     Effect.provide(
-      Launcher.layer.pipe(
-        Layer.provide(Spotify.layer.pipe(Layer.provide(bridge))),
-        Layer.provide(recordingSpawner(ran, codes)),
-        Layer.provide(Layer.succeed(DevToolsPort, 9222))
+      Client.layer.pipe(
+        Layer.provide(handlers),
+        Layer.provide([Internals.layer, Launcher.layer]),
+        Layer.provide([bridge, recordingSpawner(ran, codes), Layer.succeed(DevToolsPort, 9222)])
       )
     )
   )
