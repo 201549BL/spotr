@@ -93,8 +93,8 @@ export const Spotr = RpcGroup.make(
     .annotate(OpenRpc.Errors, []),
   op("launch", "Start Spotify with its DevTools port open (macOS)", { success: LaunchResult })
 ).annotate(OpenRpc.Errors, [{
-  code: 0,
-  message: "error.data[0].error is one of the SpotifyError components: its _tag, fields, message, hint and detail"
+  code: 1,
+  message: "code is the error's exit code (2 to 7). data is one of the SpotifyError components: its _tag, fields, message, hint and detail"
 }])
 
 export type Operation = RpcGroup.Rpcs<typeof Spotr>

@@ -251,7 +251,7 @@ const toggle = Command.make("toggle", {}, () =>
   Client.use((client) => client.toggle()).pipe(present(statusText))
 ).pipe(Command.withDescription(describe("toggle")))
 
-const serve = Command.make("serve", {}, () => Layer.launch(server)).pipe(
+const serve = Command.make("serve", {}, () => server).pipe(
   Command.withDescription("Serve every operation as JSON-RPC 2.0 on stdin and stdout, one message per line")
 )
 

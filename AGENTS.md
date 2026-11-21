@@ -20,7 +20,7 @@ TypeScript CLI that controls the Spotify desktop app over Chrome DevTools Protoc
 - `src/core/handlers.ts` maps each operation to `Spotify` or `Launcher`. `live` wires the handlers to the real app, and `Client` calls them in-process.
 - `src/cli/commands.ts` holds the command tree and the layer wiring. Commands parse arguments, call an operation through `Client`, and render the result.
 - `src/cli/render.ts` turns command results and errors into text or JSON.
-- `src/server.ts` is `spotr serve`, the table as JSON-RPC 2.0 over stdio, and the OpenRPC document `spotr schema` prints.
+- `src/server.ts` is `spotr serve`, the table as JSON-RPC 2.0 over stdio, and the OpenRPC document `spotr schema` prints. It is a small JSON-RPC loop of its own rather than Effect's `RpcServer`, whose wire format carries Effect's `Cause` and stream framing that clients in other languages would have to copy. Changing its wire format breaks every client, so the README's serve section is the contract.
 - `src/mcp.ts` is `spotr mcp`. It derives one MCP tool per operation from the table.
 - `src/core/domain/` holds the Schema models, tagged errors, and pure helpers such as seek parsing.
 - `src/core/spotify/Spotify.ts` is the service commands use. Its `uses` table lists every internal method spotr calls, and `queries` every GraphQL query. `call` is typed against `uses`, and `doctor` checks both.
