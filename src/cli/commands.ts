@@ -25,6 +25,7 @@ import {
   statusText,
   volumeText
 } from "./render.ts"
+import { mcp as mcpServer } from "../mcp.ts"
 import { serve as server } from "../server.ts"
 import { Json, Port } from "../settings.ts"
 
@@ -254,6 +255,10 @@ const serve = Command.make("serve", {}, () => Layer.launch(server)).pipe(
   Command.withDescription("Serve every operation as JSON-RPC 2.0 on stdin and stdout, one message per line")
 )
 
+const mcp = Command.make("mcp", {}, () => Layer.launch(mcpServer)).pipe(
+  Command.withDescription("Serve every operation as an MCP tool on stdin and stdout")
+)
+
 export const spotr = Command.make("spotr").pipe(
   Command.withSubcommands([
     status,
@@ -278,7 +283,8 @@ export const spotr = Command.make("spotr").pipe(
     watch,
     launch,
     doctor,
-    serve
+    serve,
+    mcp
   ]),
   Command.provide(Client.layer.pipe(Layer.provideMerge(live))),
   Command.withGlobalFlags([Json, Port]),
