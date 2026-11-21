@@ -17,12 +17,13 @@ These internals aren't a public API. A Spotify update can rename or reshape them
 You need Node 24 or later, and the Spotify desktop app.
 
 ```bash
-cd cli
+git clone https://github.com/201549BL/spotr.git
+cd spotr
 npm ci
 npm link
 ```
 
-`npm link` puts a `spotr` command on your PATH. It points at this folder, so keep the checkout where it is.
+`npm link` puts a `spotr` command on your PATH. It points at your clone, so keep it where it is.
 
 ## Start Spotify with its DevTools port
 
@@ -90,4 +91,8 @@ Every command accepts `--json` for machine-readable output, and `--port` (or `SP
 
 ## Development
 
-The code layout and conventions are in [AGENTS.md](AGENTS.md). `npm run check` runs the typecheck, lint and tests, and must pass before a commit.
+The code layout and conventions are in [AGENTS.md](AGENTS.md). `npm run check` runs the typecheck, lint and tests, and must pass before a commit. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/), and a commit hook checks them.
+
+## License
+
+[MIT](LICENSE)

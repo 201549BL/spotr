@@ -4,10 +4,8 @@ TypeScript CLI that controls the Spotify desktop app over Chrome DevTools Protoc
 
 ## Commands
 
-Run from `cli/`.
-
-- `npm ci` installs dependencies and the repo's pre-commit hook.
-- `npm run check` runs typecheck, lint and tests. It must pass before committing. The pre-commit hook runs it when staged files touch `cli/`.
+- `npm ci` installs dependencies and the commit hooks.
+- `npm run check` runs typecheck, lint and tests. It must pass before committing, and the pre-commit hook runs it.
 - `npm run typecheck` is `effect-tsgo tsc`, so Effect diagnostics fail it too.
 - `npm run lint` is Oxlint with the vendored anti-slop rules.
 - `npm test` is Vitest.
@@ -26,6 +24,7 @@ Run from `cli/`.
 - `src/bridge/` is the seam to Spotify. `Bridge.ts` is the interface, `CdpBridge.ts` and `Cdp.ts` reach the real app, and `FakeBridge.ts` stands in for it in tests.
 - `src/page/agent.ts` runs inside Spotify's page. It is sent as source text, so its function body must be self-contained.
 - `test/` holds Vitest tests. Most run `Spotify` on `FakeBridge`. `agent.test.ts` runs the agent from its source text against a fake page.
+- `scripts/commit-msg.ts` is the commit-msg hook that checks for conventional commits.
 - `tools/oxlint/anti-slop/` is vendored. See its `UPSTREAM.md` before changing it.
 
 ## Rules
@@ -42,3 +41,4 @@ Run from `cli/`.
 - `FakeBridge` mirrors the real shapes. When `Spotify` starts calling a new method, add a handler that behaves like Spotify's, including its quirks.
 - Tests and fixtures use placeholder tracks, playlists and devices. Never commit data from a real Spotify account.
 - Fix lint and Effect diagnostics in the code. Do not suppress them or lower their severity.
+- Always write commit messages as [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): summary`, such as `feat(queue): add queue clear` or `fix(agent): skip placeholder playlists`. Use `feat`, `fix`, `docs`, `refactor`, `test`, `perf`, `build`, `ci`, `chore`, `style` or `revert`. Scopes are optional and name the area, such as `playback`, `queue`, `library`, `playlist`, `devices`, `search` or `agent`. Mark breaking changes with `!` after the type. The commit-msg hook rejects anything else.

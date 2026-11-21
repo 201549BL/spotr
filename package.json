@@ -1,8 +1,17 @@
 {
   "name": "spotr",
   "version": "0.1.0",
+  "description": "Control the Spotify desktop app from your terminal",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/201549BL/spotr.git"
+  },
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "bin": {
     "spotr": "src/main.ts"
   },
