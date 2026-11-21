@@ -17,7 +17,7 @@ These internals aren't a public API. A Spotify update can rename or reshape them
 You need Node 24 or later, and the Spotify desktop app.
 
 ```bash
-git clone https://github.com/201549BL/spotr.git
+git clone https://github.com/201549BL/spotrc.git
 cd spotr
 npm ci
 npm link

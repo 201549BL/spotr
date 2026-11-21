@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/201549BL/spotr.git"
+    "url": "git+https://github.com/201549BL/spotrc.git"
   },
   "type": "module",
   "engines": {
