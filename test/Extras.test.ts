@@ -2,12 +2,12 @@ import { assert, describe, it } from "@effect/vitest"
 import { type Duration, Effect, Fiber, Layer, Predicate, Ref, Stream } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { TestClock } from "effect/testing"
-import { Bridge } from "../src/bridge/Bridge.ts"
-import { FakeBridge, sampleQueue } from "../src/bridge/FakeBridge.ts"
-import { ClientNotRunning, InternalApiChanged } from "../src/domain/errors.ts"
+import { Bridge } from "../src/core/bridge/Bridge.ts"
+import { FakeBridge, sampleQueue } from "../src/core/bridge/FakeBridge.ts"
+import { ClientNotRunning, InternalApiChanged } from "../src/core/domain/errors.ts"
 import { Port } from "../src/settings.ts"
-import { Launcher } from "../src/spotify/Launcher.ts"
-import { Spotify } from "../src/spotify/Spotify.ts"
+import { Launcher } from "../src/core/spotify/Launcher.ts"
+import { Spotify } from "../src/core/spotify/Spotify.ts"
 
 const withTime = <A, E>(self: Effect.Effect<A, E>, time: Duration.Input) =>
   Effect.gen(function* () {

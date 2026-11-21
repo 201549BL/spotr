@@ -1,21 +1,21 @@
 import { Console, Effect, Stream } from "effect"
-import type { Check } from "./domain/Check.ts"
-import type { Device } from "./domain/Device.ts"
-import type { SpotifyError } from "./domain/errors.ts"
-import type { PlayerStatus } from "./domain/PlayerStatus.ts"
+import type { Check } from "../core/domain/Check.ts"
+import type { Device } from "../core/domain/Device.ts"
+import type { SpotifyError } from "../core/domain/errors.ts"
+import type { PlayerStatus } from "../core/domain/PlayerStatus.ts"
 import type {
   CreatedPlaylist,
   DeletedPlaylist,
   LikeResult,
   Playlist,
   PlaylistAddResult
-} from "./domain/Playlist.ts"
-import type { Queue } from "./domain/Queue.ts"
-import type { SearchResult } from "./domain/SearchResult.ts"
-import type { Track } from "./domain/Track.ts"
-import { formatTime } from "./domain/Seek.ts"
-import type { VolumeStatus } from "./domain/Volume.ts"
-import { Json } from "./settings.ts"
+} from "../core/domain/Playlist.ts"
+import type { Queue } from "../core/domain/Queue.ts"
+import type { SearchResult } from "../core/domain/SearchResult.ts"
+import type { Track } from "../core/domain/Track.ts"
+import { formatTime } from "../core/domain/Seek.ts"
+import type { VolumeStatus } from "../core/domain/Volume.ts"
+import { Json } from "../settings.ts"
 
 // Commands return data. This is the one place that decides how it
 // looks: JSON with --json, otherwise the command's text format.

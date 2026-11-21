@@ -1,10 +1,10 @@
 import { assert, describe, it } from "@effect/vitest"
 import { type Duration, Effect, Fiber, Layer } from "effect"
 import { TestClock } from "effect/testing"
-import { FakeBridge, sampleQueue } from "../src/bridge/FakeBridge.ts"
-import { relevant, SearchResult } from "../src/domain/SearchResult.ts"
-import { SpotifyUri, toPlayTarget } from "../src/domain/Track.ts"
-import { Spotify } from "../src/spotify/Spotify.ts"
+import { FakeBridge, sampleQueue } from "../src/core/bridge/FakeBridge.ts"
+import { relevant, SearchResult } from "../src/core/domain/SearchResult.ts"
+import { SpotifyUri, toPlayTarget } from "../src/core/domain/Track.ts"
+import { Spotify } from "../src/core/spotify/Spotify.ts"
 
 const TestSpotify = Spotify.layer.pipe(Layer.provide(FakeBridge(sampleQueue, 0)))
 

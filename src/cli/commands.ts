@@ -2,11 +2,11 @@ import { Effect, Layer, Option, Schema } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
 import { FetchHttpClient } from "effect/http"
 import { Socket } from "effect/socket"
-import { CdpBridge } from "./bridge/CdpBridge.ts"
-import { ChecksFailed } from "./domain/errors.ts"
-import { parseSeek } from "./domain/Seek.ts"
-import { SpotifyUri, toPlayTarget, toSpotifyUri } from "./domain/Track.ts"
-import { parseVolumeChange } from "./domain/Volume.ts"
+import { CdpBridge } from "../core/bridge/CdpBridge.ts"
+import { ChecksFailed } from "../core/domain/errors.ts"
+import { parseSeek } from "../core/domain/Seek.ts"
+import { SpotifyUri, toPlayTarget, toSpotifyUri } from "../core/domain/Track.ts"
+import { parseVolumeChange } from "../core/domain/Volume.ts"
 import {
   searchText,
   createdText,
@@ -26,9 +26,9 @@ import {
   statusText,
   volumeText
 } from "./render.ts"
-import { Json, Port } from "./settings.ts"
-import { Launcher } from "./spotify/Launcher.ts"
-import { Spotify } from "./spotify/Spotify.ts"
+import { Json, Port } from "../settings.ts"
+import { Launcher } from "../core/spotify/Launcher.ts"
+import { Spotify } from "../core/spotify/Spotify.ts"
 
 const uriArgument = (description: string) =>
   Argument.String("uri").pipe(

@@ -3,7 +3,7 @@ import { HttpClient, HttpClientResponse } from "effect/http"
 import { Socket } from "effect/socket"
 import { BridgeTimeout, ClientNotRunning, InternalApiChanged } from "../domain/errors.ts"
 import { installAgent } from "../page/agent.ts"
-import { Port } from "../settings.ts"
+import { Port } from "../../settings.ts"
 import { Bridge } from "./Bridge.ts"
 import * as Cdp from "./Cdp.ts"
 

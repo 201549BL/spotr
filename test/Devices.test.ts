@@ -1,9 +1,9 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
-import { Bridge } from "../src/bridge/Bridge.ts"
-import { FakeBridge, sampleQueue } from "../src/bridge/FakeBridge.ts"
-import type { Device } from "../src/domain/Device.ts"
-import { Spotify } from "../src/spotify/Spotify.ts"
+import { Bridge } from "../src/core/bridge/Bridge.ts"
+import { FakeBridge, sampleQueue } from "../src/core/bridge/FakeBridge.ts"
+import type { Device } from "../src/core/domain/Device.ts"
+import { Spotify } from "../src/core/spotify/Spotify.ts"
 
 const fake = FakeBridge(sampleQueue, 0)
 

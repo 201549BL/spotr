@@ -1,11 +1,11 @@
 import { assert, describe, it } from "@effect/vitest"
 import { type Duration, Effect, Fiber, Layer } from "effect"
 import { TestClock } from "effect/testing"
-import { FakeBridge, sampleContext, sampleQueue } from "../src/bridge/FakeBridge.ts"
-import type { PlayerStatus } from "../src/domain/PlayerStatus.ts"
-import { SpotifyUri } from "../src/domain/Track.ts"
-import type { VolumeStatus } from "../src/domain/Volume.ts"
-import { Spotify } from "../src/spotify/Spotify.ts"
+import { FakeBridge, sampleContext, sampleQueue } from "../src/core/bridge/FakeBridge.ts"
+import type { PlayerStatus } from "../src/core/domain/PlayerStatus.ts"
+import { SpotifyUri } from "../src/core/domain/Track.ts"
+import type { VolumeStatus } from "../src/core/domain/Volume.ts"
+import { Spotify } from "../src/core/spotify/Spotify.ts"
 
 const spotifyWith = (staleReads: number) =>
   Spotify.layer.pipe(Layer.provide(FakeBridge(sampleQueue, staleReads)))
