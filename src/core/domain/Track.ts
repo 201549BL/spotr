@@ -29,7 +29,7 @@ export class Track extends Schema.Class<Track, { readonly brand: unique symbol }
   durationMs: Schema.Int
 }) {}
 
-// What `spotr play` was asked to play: nothing (resume), a URI or link,
+// What play was asked to play: nothing (resume), a URI or link,
 // or words to search for.
 export type PlayTarget =
   | { readonly kind: "resume" }
@@ -38,8 +38,8 @@ export type PlayTarget =
 
 const decodeUri = Schema.decodeUnknownOption(SpotifyUri)
 
-export const toPlayTarget = (words: ReadonlyArray<string>): PlayTarget => {
-  const text = words.join(" ").trim()
+export const toPlayTarget = (what: string): PlayTarget => {
+  const text = what.trim()
 
   if (text === "") return { kind: "resume" }
 

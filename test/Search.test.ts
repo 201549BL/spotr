@@ -77,18 +77,18 @@ describe("relevant", () => {
 
 describe("toPlayTarget", () => {
   it("resumes with no words, plays URIs and links, and searches anything else", () => {
-    assert.deepStrictEqual(toPlayTarget([]), { kind: "resume" })
-    assert.deepStrictEqual(toPlayTarget(["  "]), { kind: "resume" })
-    assert.deepStrictEqual(toPlayTarget(["liked"]), { kind: "uri", uri: SpotifyUri.make("spotify:collection:tracks") })
-    assert.deepStrictEqual(toPlayTarget(["spotify:track:1111111111111111111111"]), {
+    assert.deepStrictEqual(toPlayTarget(""), { kind: "resume" })
+    assert.deepStrictEqual(toPlayTarget("  "), { kind: "resume" })
+    assert.deepStrictEqual(toPlayTarget("liked"), { kind: "uri", uri: SpotifyUri.make("spotify:collection:tracks") })
+    assert.deepStrictEqual(toPlayTarget("spotify:track:1111111111111111111111"), {
       kind: "uri",
       uri: SpotifyUri.make("spotify:track:1111111111111111111111")
     })
-    assert.deepStrictEqual(toPlayTarget(["https://open.spotify.com/album/0000000000000000000000?si=x"]), {
+    assert.deepStrictEqual(toPlayTarget("https://open.spotify.com/album/0000000000000000000000?si=x"), {
       kind: "uri",
       uri: SpotifyUri.make("spotify:album:0000000000000000000000")
     })
-    assert.deepStrictEqual(toPlayTarget(["around", "the", "world"]), { kind: "search", text: "around the world" })
-    assert.deepStrictEqual(toPlayTarget(["liked", "songs"]), { kind: "search", text: "liked songs" })
+    assert.deepStrictEqual(toPlayTarget("around the world"), { kind: "search", text: "around the world" })
+    assert.deepStrictEqual(toPlayTarget("liked songs"), { kind: "search", text: "liked songs" })
   })
 })

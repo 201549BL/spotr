@@ -1,12 +1,11 @@
 import { Effect, Layer, Option, Schema } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
-import { FetchHttpClient } from "effect/http"
-import { Socket } from "effect/socket"
-import { CdpBridge } from "../core/bridge/CdpBridge.ts"
 import { ChecksFailed } from "../core/domain/errors.ts"
 import { parseSeek } from "../core/domain/Seek.ts"
-import { SpotifyUri, toPlayTarget, toSpotifyUri } from "../core/domain/Track.ts"
+import { SpotifyUri, toSpotifyUri } from "../core/domain/Track.ts"
 import { parseVolumeChange } from "../core/domain/Volume.ts"
+import { Client, live } from "../core/handlers.ts"
+import { describe } from "../core/operations.ts"
 import {
   searchText,
   createdText,
@@ -27,8 +26,6 @@ import {
   volumeText
 } from "./render.ts"
 import { Json, Port } from "../settings.ts"
-import { Launcher } from "../core/spotify/Launcher.ts"
-import { Spotify } from "../core/spotify/Spotify.ts"
 
 const uriArgument = (description: string) =>
   Argument.String("uri").pipe(
@@ -37,9 +34,13 @@ const uriArgument = (description: string) =>
     Argument.withSchema(SpotifyUri)
   )
 
+// Optional track arguments become a payload without the uri key, which
+// the handlers read as the playing track.
+const trackOf = (uri: Option.Option<SpotifyUri>) => Option.match(uri, { onNone: () => ({}), onSome: (track) => ({ uri: track }) })
+
 const status = Command.make("status", {}, () =>
-  Spotify.use((spotify) => spotify.status).pipe(present(statusText))
-).pipe(Command.withDescription("Show what's playing"))
+  Client.use((client) => client.status()).pipe(present(statusText))
+).pipe(Command.withDescription(describe("status")))
 
 const play = Command.make(
   "play",
@@ -49,20 +50,8 @@ const play = Command.make(
       Argument.variadic()
     )
   },
-  ({ what }) =>
-    Spotify.use((spotify) => {
-      const target = toPlayTarget(what)
-
-      switch (target.kind) {
-        case "resume":
-          return spotify.resume
-        case "uri":
-          return spotify.play(target.uri)
-        case "search":
-          return spotify.playSearch(target.text)
-      }
-    }).pipe(present(statusText))
-).pipe(Command.withDescription("Play something by URI, link or search, or resume"))
+  ({ what }) => Client.use((client) => client.play({ what: what.join(" ") })).pipe(present(statusText))
+).pipe(Command.withDescription(describe("play")))
 
 const search = Command.make(
   "search",
@@ -74,24 +63,24 @@ const search = Command.make(
       Flag.withDefault(10)
     )
   },
-  ({ words, limit }) => Spotify.use((spotify) => spotify.search(words.join(" "), limit)).pipe(present(searchText))
-).pipe(Command.withDescription("Search Spotify, best match first"))
+  ({ words, limit }) => Client.use((client) => client.search({ text: words.join(" "), limit })).pipe(present(searchText))
+).pipe(Command.withDescription(describe("search")))
 
 const pause = Command.make("pause", {}, () =>
-  Spotify.use((spotify) => spotify.pause).pipe(present(statusText))
-).pipe(Command.withDescription("Pause playback"))
+  Client.use((client) => client.pause()).pipe(present(statusText))
+).pipe(Command.withDescription(describe("pause")))
 
 const resume = Command.make("resume", {}, () =>
-  Spotify.use((spotify) => spotify.resume).pipe(present(statusText))
-).pipe(Command.withDescription("Resume playback"))
+  Client.use((client) => client.resume()).pipe(present(statusText))
+).pipe(Command.withDescription(describe("resume")))
 
 const next = Command.make("next", {}, () =>
-  Spotify.use((spotify) => spotify.next).pipe(present(statusText))
-).pipe(Command.withDescription("Skip to the next track"))
+  Client.use((client) => client.next()).pipe(present(statusText))
+).pipe(Command.withDescription(describe("next")))
 
 const previous = Command.make("previous", {}, () =>
-  Spotify.use((spotify) => spotify.previous).pipe(present(statusText))
-).pipe(Command.withDescription("Go back to the previous track, or restart this one"))
+  Client.use((client) => client.previous()).pipe(present(statusText))
+).pipe(Command.withDescription(describe("previous")))
 
 const seek = Command.make(
   "seek",
@@ -101,15 +90,15 @@ const seek = Command.make(
       Argument.filterMap(parseSeek, (input) => `Expected a time like 1:30, 90, +10 or -10, got "${input}"`)
     )
   },
-  ({ position }) => Spotify.use((spotify) => spotify.seek(position)).pipe(present(statusText))
-).pipe(Command.withDescription("Jump to a position in the track"))
+  ({ position }) => Client.use((client) => client.seek(position)).pipe(present(statusText))
+).pipe(Command.withDescription(describe("seek")))
 
 const shuffle = Command.make(
   "shuffle",
   { mode: Argument.Literals("mode", ["on", "off"]).pipe(Argument.optional) },
   ({ mode }) =>
-    Spotify.use((spotify) =>
-      Option.match(mode, { onNone: () => spotify.status, onSome: (on) => spotify.setShuffle(on === "on") })
+    Client.use((client) =>
+      Option.match(mode, { onNone: () => client.status(), onSome: (on) => client.setShuffle({ on: on === "on" }) })
     ).pipe(present(shuffleText))
 ).pipe(Command.withDescription("Show shuffle, or turn it on or off"))
 
@@ -117,25 +106,25 @@ const repeat = Command.make(
   "repeat",
   { mode: Argument.Literals("mode", ["off", "all", "one"]).pipe(Argument.optional) },
   ({ mode }) =>
-    Spotify.use((spotify) =>
-      Option.match(mode, { onNone: () => spotify.status, onSome: spotify.setRepeat })
+    Client.use((client) =>
+      Option.match(mode, { onNone: () => client.status(), onSome: (repeat) => client.setRepeat({ mode: repeat }) })
     ).pipe(present(repeatText))
 ).pipe(Command.withDescription("Show repeat, or set it to off, all or one"))
 
 const queueAdd = Command.make("add", { uri: uriArgument("The track to add") }, ({ uri }) =>
-  Spotify.use((spotify) => spotify.addToQueue(uri)).pipe(present(queueText))
-).pipe(Command.withDescription("Add a track to the end of your queue"))
+  Client.use((client) => client.addToQueue({ uri })).pipe(present(queueText))
+).pipe(Command.withDescription(describe("addToQueue")))
 
 const queueRemove = Command.make("remove", { uri: uriArgument("The queued track to remove") }, ({ uri }) =>
-  Spotify.use((spotify) => spotify.removeFromQueue(uri)).pipe(present(queueText))
-).pipe(Command.withDescription("Remove a track you queued"))
+  Client.use((client) => client.removeFromQueue({ uri })).pipe(present(queueText))
+).pipe(Command.withDescription(describe("removeFromQueue")))
 
 const queueClear = Command.make("clear", {}, () =>
-  Spotify.use((spotify) => spotify.clearQueue).pipe(present(queueText))
-).pipe(Command.withDescription("Remove everything you queued"))
+  Client.use((client) => client.clearQueue()).pipe(present(queueText))
+).pipe(Command.withDescription(describe("clearQueue")))
 
 const queue = Command.make("queue", {}, () =>
-  Spotify.use((spotify) => spotify.queue).pipe(present(queueText))
+  Client.use((client) => client.queue()).pipe(present(queueText))
 ).pipe(
   Command.withSubcommands([queueAdd, queueRemove, queueClear]),
   Command.withDescription("Show what plays next, or change your queue")
@@ -144,18 +133,18 @@ const queue = Command.make("queue", {}, () =>
 const like = Command.make(
   "like",
   { uri: uriArgument("The track to like. Defaults to the playing track").pipe(Argument.optional) },
-  ({ uri }) => Spotify.use((spotify) => spotify.like(Option.getOrUndefined(uri))).pipe(present(likeText))
+  ({ uri }) => Client.use((client) => client.like(trackOf(uri))).pipe(present(likeText))
 ).pipe(Command.withDescription("Add a track to Liked Songs"))
 
 const unlike = Command.make(
   "unlike",
   { uri: uriArgument("The track to unlike. Defaults to the playing track").pipe(Argument.optional) },
-  ({ uri }) => Spotify.use((spotify) => spotify.unlike(Option.getOrUndefined(uri))).pipe(present(likeText))
+  ({ uri }) => Client.use((client) => client.unlike(trackOf(uri))).pipe(present(likeText))
 ).pipe(Command.withDescription("Remove a track from Liked Songs"))
 
 const playlistList = Command.make("ls", {}, () =>
-  Spotify.use((spotify) => spotify.playlists).pipe(present(playlistsText))
-).pipe(Command.withDescription("List your playlists"))
+  Client.use((client) => client.playlists()).pipe(present(playlistsText))
+).pipe(Command.withDescription(describe("playlists")))
 
 const playlistAdd = Command.make(
   "add",
@@ -164,7 +153,7 @@ const playlistAdd = Command.make(
     uri: uriArgument("The track to add. Defaults to the playing track").pipe(Argument.optional)
   },
   ({ playlist, uri }) =>
-    Spotify.use((spotify) => spotify.addToPlaylist(playlist, Option.getOrUndefined(uri))).pipe(
+    Client.use((client) => client.addToPlaylist({ playlist, ...trackOf(uri) })).pipe(
       present(playlistAddText)
     )
 ).pipe(Command.withDescription("Add a track to one of your playlists"))
@@ -183,8 +172,8 @@ const playlistCreate = Command.make(
     )
   },
   ({ name, isPrivate }) =>
-    Spotify.use((spotify) => spotify.createPlaylist(name, isPrivate)).pipe(present(createdText))
-).pipe(Command.withDescription("Create a playlist at the top of your library"))
+    Client.use((client) => client.createPlaylist({ name, isPrivate })).pipe(present(createdText))
+).pipe(Command.withDescription(describe("createPlaylist")))
 
 const playlistDelete = Command.make(
   "delete",
@@ -193,7 +182,7 @@ const playlistDelete = Command.make(
     yes: Flag.Boolean("yes").pipe(Flag.withDescription("Confirm the deletion"), Flag.withDefault(false))
   },
   ({ playlist, yes }) =>
-    Spotify.use((spotify) => spotify.deletePlaylist(playlist, yes)).pipe(present(deletedText))
+    Client.use((client) => client.deletePlaylist({ playlist, yes })).pipe(present(deletedText))
 ).pipe(Command.withDescription("Delete one of your playlists. Needs --yes"))
 
 const playlist = Command.make("playlist").pipe(
@@ -204,37 +193,34 @@ const playlist = Command.make("playlist").pipe(
 const devicesUse = Command.make(
   "use",
   { device: Argument.String("device").pipe(Argument.withDescription("The device's name or id")) },
-  ({ device }) => Spotify.use((spotify) => spotify.useDevice(device)).pipe(present(devicesText))
-).pipe(Command.withDescription("Move playback to another device"))
+  ({ device }) => Client.use((client) => client.useDevice({ device })).pipe(present(devicesText))
+).pipe(Command.withDescription(describe("useDevice")))
 
 const devices = Command.make("devices", {}, () =>
-  Spotify.use((spotify) => spotify.devices).pipe(present(devicesText))
+  Client.use((client) => client.devices()).pipe(present(devicesText))
 ).pipe(
   Command.withSubcommands([devicesUse]),
   Command.withDescription("List Spotify Connect devices, or switch to one")
 )
 
 const watch = Command.make("watch", {}, () =>
-  Spotify.use((spotify) => Effect.succeed(spotify.watch)).pipe(Effect.flatMap(presentEach(watchText)))
+  Client.use((client) => Effect.succeed(client.watch())).pipe(Effect.flatMap(presentEach(watchText)))
 ).pipe(Command.withDescription("Print a line whenever the track or play state changes. Ctrl+C stops"))
 
 const launch = Command.make("launch", {}, () =>
-  Launcher.use((launcher) => launcher.launch).pipe(present(launchText))
-).pipe(
-  Command.provide(Launcher.layer),
-  Command.withDescription("Start Spotify with its DevTools port open (macOS)")
-)
+  Client.use((client) => client.launch()).pipe(present(launchText))
+).pipe(Command.withDescription(describe("launch")))
 
 const doctor = Command.make("doctor", {}, () =>
   Effect.gen(function* () {
-    const checks = yield* Spotify.use((spotify) => spotify.doctor)
+    const checks = yield* Client.use((client) => client.doctor())
     const failed = checks.filter((check) => check.status === "fail").length
 
     yield* Effect.succeed(checks).pipe(present(doctorText))
 
     if (failed > 0) return yield* new ChecksFailed({ failed })
   })
-).pipe(Command.withDescription("Check that spotr can reach and drive Spotify"))
+).pipe(Command.withDescription(describe("doctor")))
 
 const volume = Command.make(
   "volume",
@@ -246,22 +232,22 @@ const volume = Command.make(
     )
   },
   ({ change }) =>
-    Spotify.use((spotify) =>
-      Option.match(change, { onNone: () => spotify.volume, onSome: spotify.setVolume })
+    Client.use((client) =>
+      Option.match(change, { onNone: () => client.volume(), onSome: (level) => client.setVolume(level) })
     ).pipe(present(volumeText))
 ).pipe(Command.withDescription("Show the volume, or change it"))
 
 const mute = Command.make("mute", {}, () =>
-  Spotify.use((spotify) => spotify.mute).pipe(present(volumeText))
-).pipe(Command.withDescription("Mute Spotify"))
+  Client.use((client) => client.mute()).pipe(present(volumeText))
+).pipe(Command.withDescription(describe("mute")))
 
 const unmute = Command.make("unmute", {}, () =>
-  Spotify.use((spotify) => spotify.unmute).pipe(present(volumeText))
-).pipe(Command.withDescription("Unmute Spotify, back to the volume before muting"))
+  Client.use((client) => client.unmute()).pipe(present(volumeText))
+).pipe(Command.withDescription(describe("unmute")))
 
 const toggle = Command.make("toggle", {}, () =>
-  Spotify.use((spotify) => spotify.toggle).pipe(present(statusText))
-).pipe(Command.withDescription("Pause if playing, resume if paused"))
+  Client.use((client) => client.toggle()).pipe(present(statusText))
+).pipe(Command.withDescription(describe("toggle")))
 
 export const spotr = Command.make("spotr").pipe(
   Command.withSubcommands([
@@ -288,12 +274,7 @@ export const spotr = Command.make("spotr").pipe(
     launch,
     doctor
   ]),
-  Command.provide(
-    Spotify.layer.pipe(
-      Layer.provide(CdpBridge),
-      Layer.provide([FetchHttpClient.layer, Socket.layerWebSocketConstructorGlobal])
-    )
-  ),
+  Command.provide(Client.layer.pipe(Layer.provideMerge(live))),
   Command.withGlobalFlags([Json, Port]),
   Command.withDescription("Control the Spotify desktop app")
 )

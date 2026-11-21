@@ -1,7 +1,9 @@
-import { Option } from "effect"
+import { Option, Schema } from "effect"
 
 // Where to seek: an absolute position, or an offset from the current one.
-export type SeekTarget = { readonly relative: boolean; readonly ms: number }
+export const SeekTarget = Schema.Struct({ relative: Schema.Boolean, ms: Schema.Int })
+
+export type SeekTarget = typeof SeekTarget.Type
 
 // Accepts "90" or "1:30" (absolute), and "+10", "-10" or "+1:00" (relative).
 export const parseSeek = (input: string): Option.Option<SeekTarget> => {
