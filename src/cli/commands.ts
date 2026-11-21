@@ -1,4 +1,4 @@
-import { Effect, Layer, Option, Schema } from "effect"
+import { Console, Effect, Layer, Option, Schema } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
 import { ChecksFailed } from "../core/domain/errors.ts"
 import { parseSeek } from "../core/domain/Seek.ts"
@@ -26,7 +26,7 @@ import {
   volumeText
 } from "./render.ts"
 import { mcp as mcpServer } from "../mcp.ts"
-import { serve as server } from "../server.ts"
+import { openRpc, serve as server } from "../server.ts"
 import { Json, Port } from "../settings.ts"
 
 const uriArgument = (description: string) =>
@@ -259,6 +259,10 @@ const mcp = Command.make("mcp", {}, () => Layer.launch(mcpServer)).pipe(
   Command.withDescription("Serve every operation as an MCP tool on stdin and stdout")
 )
 
+const schema = Command.make("schema", {}, () => Console.log(JSON.stringify(openRpc, null, 2))).pipe(
+  Command.withDescription("Print the OpenRPC document for spotr serve")
+)
+
 export const spotr = Command.make("spotr").pipe(
   Command.withSubcommands([
     status,
@@ -284,7 +288,8 @@ export const spotr = Command.make("spotr").pipe(
     launch,
     doctor,
     serve,
-    mcp
+    mcp,
+    schema
   ]),
   Command.provide(Client.layer.pipe(Layer.provideMerge(live))),
   Command.withGlobalFlags([Json, Port]),

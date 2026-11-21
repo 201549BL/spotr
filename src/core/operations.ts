@@ -88,12 +88,14 @@ export const Spotr = RpcGroup.make(
   ),
   // Failed checks are part of the answer, not an error, so clients get
   // the whole list.
-  Rpc.make("doctor", { success: Schema.Array(Check) }).annotate(
-    OpenRpc.Description,
-    "Check that spotr can reach and drive Spotify"
-  ),
+  Rpc.make("doctor", { success: Schema.Array(Check) })
+    .annotate(OpenRpc.Description, "Check that spotr can reach and drive Spotify")
+    .annotate(OpenRpc.Errors, []),
   op("launch", "Start Spotify with its DevTools port open (macOS)", { success: LaunchResult })
-)
+).annotate(OpenRpc.Errors, [{
+  code: 0,
+  message: "error.data[0].error is one of the SpotifyError components: its _tag, fields, message, hint and detail"
+}])
 
 export type Operation = RpcGroup.Rpcs<typeof Spotr>
 
