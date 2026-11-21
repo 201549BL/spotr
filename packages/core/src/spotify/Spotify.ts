@@ -442,12 +442,14 @@ export class Spotify extends Context.Service<Spotify, {
           return yield* pollUntil(volume, (now) => now.volume === level)
         })
 
+      // Spotify's mute helper flips its flag first and moves the volume
+      // after, so wait for both: unmuting too early restores the wrong level.
       const mute = call("PlaybackAPI", "getMuteHelper.mute").pipe(
-        Effect.andThen(pollUntil(volume, (now) => now.muted))
+        Effect.andThen(pollUntil(volume, (now) => now.muted && now.volume === 0))
       )
 
       const unmute = call("PlaybackAPI", "getMuteHelper.unmute").pipe(
-        Effect.andThen(pollUntil(volume, (now) => !now.muted))
+        Effect.andThen(pollUntil(volume, (now) => !now.muted && now.volume > 0))
       )
 
       // The query behind Spotify's quick-search box. It returns a mix of

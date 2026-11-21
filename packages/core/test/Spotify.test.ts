@@ -162,8 +162,8 @@ describe("Spotify", () => {
 
       yield* spotify.setVolume({ relative: false, amount: 40 })
 
-      assert.strictEqual(level(yield* spotify.mute), "0 muted")
-      assert.strictEqual(level(yield* spotify.mute), "0 muted")
+      assert.strictEqual(level(yield* withTime(spotify.mute, "300 millis")), "0 muted")
+      assert.strictEqual(level(yield* withTime(spotify.mute, "300 millis")), "0 muted")
       assert.strictEqual(level(yield* spotify.unmute), "40")
       assert.strictEqual(level(yield* spotify.unmute), "40")
     }).pipe(Effect.provide(spotifyWith(0))))
