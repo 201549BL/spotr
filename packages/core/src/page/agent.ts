@@ -56,15 +56,15 @@ export type Agent = {
 
 declare global {
   interface Window {
-    __spotr?: Agent
+    __spotrc?: Agent
     __webpack_modules__?: Readonly<Record<string, { toString(): string }>>
   }
 }
 
 export const installAgent = (): Agent => {
-  const version = 6
+  const version = 7
 
-  if (window.__spotr?.version === version) return window.__spotr
+  if (window.__spotrc?.version === version) return window.__spotrc
 
   // The object owning getRegistry() is passed down React's tree as a
   // context value, so walk the tree from the root element.
@@ -192,7 +192,7 @@ export const installAgent = (): Agent => {
     }
   }
 
-  window.__spotr = agent
+  window.__spotrc = agent
 
   return agent
 }

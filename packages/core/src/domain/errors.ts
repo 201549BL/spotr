@@ -20,7 +20,7 @@ export class ClientNotRunning extends Schema.TaggedError<
 
   get hint() {
     return this.reason === "port"
-      ? `Run spotr launch, or start Spotify with --remote-debugging-port=${this.port}.`
+      ? `Run spotrc launch, or start Spotify with --remote-debugging-port=${this.port}.`
       : "Spotify may still be starting. Wait a moment and try again."
   }
 
@@ -67,7 +67,7 @@ export class InternalApiChanged extends Schema.TaggedError<
     return `Spotify returned something unexpected for ${this.operation}`
   }
 
-  readonly hint = "Spotify has probably updated, and spotr needs a fix."
+  readonly hint = "Spotify has probably updated, and spotrc needs a fix."
 
   get detail() {
     return this.issue
@@ -90,7 +90,7 @@ export class NotFound extends Schema.TaggedError<
   }
 
   get detail() {
-    return "spotr looked it up in Spotify and got no match"
+    return "spotrc looked it up in Spotify and got no match"
   }
 }
 
@@ -108,7 +108,7 @@ export class SpotifyWithoutDebugPort extends Schema.TaggedError<
   }
 
   get hint() {
-    return "Quit Spotify, then run spotr launch again."
+    return "Quit Spotify, then run spotrc launch again."
   }
 
   get detail() {
@@ -126,7 +126,7 @@ export class LaunchFailed extends Schema.TaggedError<
   readonly [Runtime.errorReported] = false
 
   get message() {
-    return "spotr couldn't start Spotify"
+    return "spotrc couldn't start Spotify"
   }
 
   get hint() {
@@ -185,7 +185,7 @@ export class NeedsConfirmation extends Schema.TaggedError<
   readonly [Runtime.errorReported] = false
 
   get message() {
-    return `spotr won't ${this.action} without --yes`
+    return `spotrc won't ${this.action} without --yes`
   }
 
   get hint() {

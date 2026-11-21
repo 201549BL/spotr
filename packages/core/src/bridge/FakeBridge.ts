@@ -95,7 +95,7 @@ export const sampleDevices = [
 const profiles = (...names: ReadonlyArray<string>) => ({ items: names.map((name) => ({ profile: { name } })) })
 
 // What the fake's search can find, in Spotify's searchModalResults shape,
-// including a hit of a type spotr doesn't know.
+// including a hit of a type spotrc doesn't know.
 const searchable = [
   { __typename: "Track", uri: sampleQueue[0]?.uri, name: "First Song", artists: profiles("Some Artist"), albumOfTrack: {} },
   { __typename: "Album", uri: sampleContext, name: "Sample Album", artists: profiles("Some Artist"), type: "ALBUM" },

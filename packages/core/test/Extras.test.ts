@@ -55,21 +55,21 @@ const doctorWith = (bridge: Layer.Layer<Bridge>) =>
   )
 
 describe("doctor", () => {
-  it.effect("passes every check when Spotify has every method spotr uses", () =>
+  it.effect("passes every check when Spotify has every method spotrc uses", () =>
     Effect.gen(function* () {
       const checks = yield* doctorWith(FakeBridge(sampleQueue, 0))
 
       assert.deepStrictEqual(checks, [
         "pass Spotify answers on the DevTools port",
         "pass Spotify's window is open",
-        "pass spotr's agent reaches Spotify's internals",
-        "pass PlayerAPI has the 13 methods spotr uses",
-        "pass PlaybackAPI has the 5 methods spotr uses",
-        "pass LibraryAPI has the 3 methods spotr uses",
-        "pass RootlistAPI has the 6 methods spotr uses",
-        "pass PlaylistAPI has the method spotr uses",
-        "pass ConnectDevicesAPI has the method spotr uses",
-        "pass ConnectTransferAPI has the method spotr uses",
+        "pass spotrc's agent reaches Spotify's internals",
+        "pass PlayerAPI has the 13 methods spotrc uses",
+        "pass PlaybackAPI has the 5 methods spotrc uses",
+        "pass LibraryAPI has the 3 methods spotrc uses",
+        "pass RootlistAPI has the 6 methods spotrc uses",
+        "pass PlaylistAPI has the method spotrc uses",
+        "pass ConnectDevicesAPI has the method spotrc uses",
+        "pass ConnectTransferAPI has the method spotrc uses",
         "pass Spotify's search query is defined"
       ])
     }))
@@ -86,16 +86,16 @@ describe("doctor", () => {
       assert.deepStrictEqual(noPort.slice(0, 3), [
         "fail Spotify answers on the DevTools port",
         "skipped Spotify's window is open",
-        "skipped spotr's agent reaches Spotify's internals"
+        "skipped spotrc's agent reaches Spotify's internals"
       ])
       assert.deepStrictEqual(noPage.slice(0, 3), [
         "pass Spotify answers on the DevTools port",
         "fail Spotify's window is open",
-        "skipped spotr's agent reaches Spotify's internals"
+        "skipped spotrc's agent reaches Spotify's internals"
       ])
       assert.deepStrictEqual(notReady.slice(2, 4), [
-        "fail spotr's agent reaches Spotify's internals",
-        "skipped PlayerAPI has the 13 methods spotr uses"
+        "fail spotrc's agent reaches Spotify's internals",
+        "skipped PlayerAPI has the 13 methods spotrc uses"
       ])
     }))
 
@@ -114,8 +114,8 @@ describe("doctor", () => {
       assert.deepStrictEqual(
         checks.flatMap(({ name, status, detail }) => status === "fail" ? [`${name}: ${detail}`] : []),
         [
-          "LibraryAPI has the 3 methods spotr uses: lacks contains",
-          "PlaylistAPI has the method spotr uses: ApiMissing: No internal API named PlaylistAPI"
+          "LibraryAPI has the 3 methods spotrc uses: lacks contains",
+          "PlaylistAPI has the method spotrc uses: ApiMissing: No internal API named PlaylistAPI"
         ]
       )
     }))

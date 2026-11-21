@@ -1,8 +1,8 @@
 import { Cause, Effect, FiberMap, Option, Runtime, Schema, SchemaAST, Stdio, Stream } from "effect"
 import { OpenRpc, RpcSchema, RpcTest } from "effect/rpc"
-import { type Operation, SpotifyError, Spotr } from "spotr-core"
+import { type Operation, SpotifyError, Spotrc } from "@spotrc/core"
 
-// The JSON-RPC 2.0 codes spotr uses besides each error's exit code.
+// The JSON-RPC 2.0 codes spotrc uses besides each error's exit code.
 // -32800 is LSP's request-cancelled code, which StreamJsonRpc and
 // vscode-jsonrpc also understand.
 const codes = {
@@ -46,7 +46,7 @@ const fail = (code: number, message: string): Reply => ({ error: { code, message
 const toJson = <S extends Schema.ConstraintEncoder<unknown>>(schema: S) => (value: S["Type"]) =>
   Schema.encodeUnknownEffect(schema)(value).pipe(Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)))
 
-// A spotr error goes out with its exit code as the code, its message as
+// A spotrc error goes out with its exit code as the code, its message as
 // the message, and its tag, fields, message, hint and detail as data.
 const failWith = (error: SpotifyError) =>
   toJson(SpotifyError)(error).pipe(
@@ -66,7 +66,7 @@ export const serve = Effect.gen(function* () {
   // SAFETY: operations are looked up by name at runtime, so TypeScript
   // can't pair a payload with its operation. Each payload is decoded with
   // its own operation's schema before the call.
-  const call = (yield* RpcTest.makeClient(Spotr, { flatten: true })) as (
+  const call = (yield* RpcTest.makeClient(Spotrc, { flatten: true })) as (
     tag: string,
     payload: Payload
   ) => Effect.Effect<Success, SpotifyError> & Stream.Stream<Chunk, SpotifyError>
@@ -100,9 +100,9 @@ export const serve = Effect.gen(function* () {
 
   const request = (id: Id | undefined, method: string, params: Schema.Json | undefined) =>
     Effect.gen(function* () {
-      const rpc = Spotr.requests.get(method)
+      const rpc = Spotrc.requests.get(method)
 
-      if (rpc === undefined) return yield* answer(id, fail(codes.methodNotFound, `spotr has no operation named ${method}`))
+      if (rpc === undefined) return yield* answer(id, fail(codes.methodNotFound, `spotrc has no operation named ${method}`))
 
       const payload = SchemaAST.isVoid(rpc.payloadSchema.ast)
         ? Option.some<Payload>(undefined)
@@ -159,7 +159,7 @@ export const serve = Effect.gen(function* () {
 
       if (id === undefined) return yield* Effect.forkScoped(work)
 
-      const rpc = Spotr.requests.get(method)
+      const rpc = Spotrc.requests.get(method)
       const isStream = rpc !== undefined && RpcSchema.isStreamSchema(rpc.successSchema)
 
       yield* FiberMap.run(isStream ? streams : calls, id, work)
@@ -171,5 +171,5 @@ export const serve = Effect.gen(function* () {
   yield* FiberMap.awaitEmpty(calls)
 }).pipe(Effect.scoped)
 
-// What spotr serve speaks, as an OpenRPC document for client generators.
-export const openRpc = OpenRpc.fromRpcGroup(Spotr, { info: { title: "spotr", version: "0.1.0" } })
+// What spotrc serve speaks, as an OpenRPC document for client generators.
+export const openRpc = OpenRpc.fromRpcGroup(Spotrc, { info: { title: "spotrc", version: "0.1.0" } })

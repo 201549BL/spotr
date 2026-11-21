@@ -1,11 +1,11 @@
 import { assert, describe, it } from "@effect/vitest"
 import { type Cause, Effect, type Schema, Fiber, Layer, Queue, Sink, Stdio, Stream } from "effect"
 import { serve } from "../src/server.ts"
-import { fakeCore } from "./core.ts"
+import { fake } from "@spotrc/core"
 
 const encoder = new TextEncoder()
 
-// Runs `spotr serve` on fake stdin and stdout. `send` writes one request
+// Runs `spotrc serve` on fake stdin and stdout. `send` writes one request
 // line, `end` closes stdin, `next` reads the next line the server wrote,
 // and `done` waits for the server to stop.
 const connect = Effect.gen(function* () {
@@ -13,7 +13,7 @@ const connect = Effect.gen(function* () {
   const stdout = yield* Queue.unbounded<string>()
 
   const server = yield* serve.pipe(
-    Effect.provide(Layer.merge(fakeCore, Stdio.layerTest({
+    Effect.provide(Layer.merge(fake, Stdio.layerTest({
       stdin: Stream.fromQueue(stdin),
       stdout: () => Sink.forEach((chunk) => Queue.offer(stdout, String(chunk).trimEnd()))
     }))),
@@ -30,7 +30,7 @@ const connect = Effect.gen(function* () {
   }
 })
 
-describe("spotr serve", () => {
+describe("spotrc serve", () => {
   it.effect("answers an operation without params", () =>
     Effect.gen(function* () {
       const server = yield* connect
@@ -49,7 +49,7 @@ describe("spotr serve", () => {
       assert.strictEqual(yield* server.next, "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"result\":{\"volume\":40,\"muted\":false}}")
     }))
 
-  it.effect("sends a spotr error flat, with its exit code as the code", () =>
+  it.effect("sends a spotrc error flat, with its exit code as the code", () =>
     Effect.gen(function* () {
       const server = yield* connect
 
@@ -59,9 +59,9 @@ describe("spotr serve", () => {
         yield* server.next,
         "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":5,\"message\":\"Device \\\"Nowhere\\\" wasn't found\"," +
           "\"data\":{\"_tag\":\"NotFound\",\"what\":\"Device \\\"Nowhere\\\"\"," +
-          "\"hint\":\"Run spotr devices to see the devices Spotify can play on.\"," +
+          "\"hint\":\"Run spotrc devices to see the devices Spotify can play on.\"," +
           "\"message\":\"Device \\\"Nowhere\\\" wasn't found\"," +
-          "\"detail\":\"spotr looked it up in Spotify and got no match\"}}}"
+          "\"detail\":\"spotrc looked it up in Spotify and got no match\"}}}"
       )
     }))
 
@@ -75,7 +75,7 @@ describe("spotr serve", () => {
 
       assert.deepStrictEqual([yield* server.next, yield* server.next, yield* server.next], [
         "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32700,\"message\":\"Not JSON\"}}",
-        "{\"jsonrpc\":\"2.0\",\"id\":2,\"error\":{\"code\":-32601,\"message\":\"spotr has no operation named bogus\"}}",
+        "{\"jsonrpc\":\"2.0\",\"id\":2,\"error\":{\"code\":-32601,\"message\":\"spotrc has no operation named bogus\"}}",
         "{\"jsonrpc\":\"2.0\",\"id\":3,\"error\":{\"code\":-32602,\"message\":\"Missing key\\n  at [\\\"text\\\"]\"}}"
       ])
     }))

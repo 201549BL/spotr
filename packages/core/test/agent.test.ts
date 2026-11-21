@@ -181,7 +181,7 @@ describe("page agent", () => {
 
     const older = { ...first, version: 1 }
 
-    Object.assign(globalThis, { window: { __spotr: older } })
+    Object.assign(globalThis, { window: { __spotrc: older } })
 
     const replaced = install()
 

@@ -1,18 +1,21 @@
 import { Context, Effect, Layer } from "effect"
 import { FetchHttpClient } from "effect/http"
 import { type RpcClient, RpcTest } from "effect/rpc"
+import { ChildProcessSpawner } from "effect/process"
 import { Socket } from "effect/socket"
 import { CdpBridge } from "./bridge/CdpBridge.ts"
+import { FakeBridge, sampleQueue } from "./bridge/FakeBridge.ts"
+import { DevToolsPort } from "./DevToolsPort.ts"
 import { toPlayTarget } from "./domain/Track.ts"
-import { type Operation, Spotr } from "./operations.ts"
+import { type Operation, Spotrc } from "./operations.ts"
 import { Launcher } from "./spotify/Launcher.ts"
 import { Spotify } from "./spotify/Spotify.ts"
 
-export const handlers = Spotr.toLayer(Effect.gen(function* () {
+export const handlers = Spotrc.toLayer(Effect.gen(function* () {
   const spotify = yield* Spotify
   const launcher = yield* Launcher
 
-  return Spotr.of({
+  return Spotrc.of({
     status: () => spotify.status,
     play: ({ what }) => {
       const target = toPlayTarget(what)
@@ -65,8 +68,20 @@ export const live = handlers.pipe(
   Layer.provide([FetchHttpClient.layer, Socket.layerWebSocketConstructorGlobal])
 )
 
+// The handlers on FakeBridge, for testing an adapter without Spotify.
+export const fake = handlers.pipe(
+  Layer.provide(Launcher.layer),
+  Layer.provide(Spotify.layer),
+  Layer.provide(FakeBridge(sampleQueue, 0)),
+  Layer.provide(Layer.succeed(DevToolsPort, 9222)),
+  Layer.provide(Layer.succeed(
+    ChildProcessSpawner.ChildProcessSpawner,
+    ChildProcessSpawner.make(() => Effect.die("the fake core never launches Spotify"))
+  ))
+)
+
 // Calls the operations in-process, through the same handlers the servers
 // use. The CLI and the MCP server talk to the core through this.
-export class Client extends Context.Service<Client, RpcClient.RpcClient<Operation>>()("spotr/Client") {
-  static readonly layer = Layer.effect(Client, RpcTest.makeClient(Spotr))
+export class Client extends Context.Service<Client, RpcClient.RpcClient<Operation>>()("spotrc/Client") {
+  static readonly layer = Layer.effect(Client, RpcTest.makeClient(Spotrc))
 }

@@ -39,7 +39,7 @@ const RawQueue = Schema.Struct({
 
 export const decodeQueue = Schema.decodeUnknownEffect(RawQueue)
 
-// The parts of PlayerAPI.getState() spotr uses. Spotify's own UI treats
+// The parts of PlayerAPI.getState() spotrc uses. Spotify's own UI treats
 // `item` as possibly missing, and the whole state is null before the
 // player's first update.
 const RawState = Schema.NullOr(Schema.Struct({
@@ -171,8 +171,8 @@ const Profiles = Schema.Struct({ items: Schema.Array(Schema.Struct({ profile: Na
 
 const OwnedBy = Schema.Struct({ data: Named })
 
-// The search hits spotr knows, by Spotify's __typename. Spotify's own
-// search box skips types it doesn't know, and spotr does the same.
+// The search hits spotrc knows, by Spotify's __typename. Spotify's own
+// search box skips types it doesn't know, and spotrc does the same.
 const RawHit = Schema.Union([
   Schema.Struct({ __typename: Schema.Literal("Track"), uri: SpotifyUri, name: Schema.String, artists: Profiles }),
   Schema.Struct({ __typename: Schema.Literal("Album"), uri: SpotifyUri, name: Schema.String, artists: Profiles }),
@@ -205,7 +205,7 @@ const decodeTypename = Schema.decodeUnknownOption(Schema.Struct({ __typename: Sc
 
 const decodeHit = Schema.decodeUnknownEffect(RawHit)
 
-// Hits of a type spotr knows are decoded fully, so a reshaped Track is
+// Hits of a type spotrc knows are decoded fully, so a reshaped Track is
 // an error rather than a silently missing result. Other types are
 // skipped, as Spotify's own search box does.
 export const toSearchResults = (search: typeof RawSearch.Type) =>

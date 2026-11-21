@@ -1,3 +1,4 @@
+import { defaultPort } from "@spotrc/core"
 import { Config } from "effect"
 import { Flag, GlobalFlag } from "effect/cli"
 
@@ -11,7 +12,7 @@ export const Json = GlobalFlag.Setting("json")({
 export const Port = GlobalFlag.Setting("port")({
   flag: Flag.Int("port").pipe(
     Flag.withDescription("Spotify's DevTools port"),
-    Flag.withFallbackConfig(Config.Int("SPOTR_PORT")),
-    Flag.withDefault(9222)
+    Flag.withFallbackConfig(Config.Int("SPOTRC_PORT")),
+    Flag.withDefault(defaultPort)
   )
 })

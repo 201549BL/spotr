@@ -1,0 +1,19 @@
+{
+  "name": "@spotrc/mcp",
+  "version": "0.1.0",
+  "description": "Serve spotrc's operations as MCP tools on stdio",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "spotrc-mcp": "src/main.ts"
+  },
+  "exports": {
+    ".": "./src/mcp.ts"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.1.4",
+    "effect": "4.1.4",
+    "@spotrc/core": "0.1.0"
+  }
+}

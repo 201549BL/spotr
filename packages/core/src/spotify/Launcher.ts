@@ -13,7 +13,7 @@ export class LaunchResult extends Schema.Class<LaunchResult, { readonly brand: u
 // `pgrep` and `open`.
 export class Launcher extends Context.Service<Launcher, {
   readonly launch: Effect.Effect<LaunchResult, SpotifyError>
-}>()("spotr/Launcher") {
+}>()("spotrc/Launcher") {
   static readonly layer = Layer.effect(
     Launcher,
     Effect.gen(function* () {
@@ -31,7 +31,7 @@ export class Launcher extends Context.Service<Launcher, {
           Effect.mapError((error) => new LaunchFailed({ issue: `${command} failed: ${error.message}` }))
         )
 
-      // No --remote-allow-origins flag: spotr's WebSocket sends no Origin
+      // No --remote-allow-origins flag: spotrc's WebSocket sends no Origin
       // header, and allowing every origin would let any web page drive
       // Spotify.
       const launch = Effect.gen(function* () {

@@ -1,5 +1,5 @@
 {
-  "name": "spotr-core",
+  "name": "@spotrc/core",
   "version": "0.1.0",
   "description": "Connect to the Spotify desktop app and drive it through its internal APIs",
   "license": "MIT",

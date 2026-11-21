@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { openRpc } from "../src/server.ts"
 
-describe("spotr schema", () => {
+describe("spotrc schema", () => {
   it("documents every operation", () => {
     assert.deepStrictEqual(openRpc.methods.map((method) => method.name), [
       "status",

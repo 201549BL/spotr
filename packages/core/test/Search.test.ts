@@ -20,7 +20,7 @@ const withTime = <A, E>(self: Effect.Effect<A, E>, time: Duration.Input) =>
 const line = ({ kind, name, by }: SearchResult) => `${kind} ${name}${by ? ` by ${by}` : ""}`
 
 describe("search", () => {
-  it.effect("returns hits best first, and skips types spotr doesn't know", () =>
+  it.effect("returns hits best first, and skips types spotrc doesn't know", () =>
     Effect.gen(function* () {
       const spotify = yield* Spotify
 

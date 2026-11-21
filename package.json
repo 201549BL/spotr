@@ -1,5 +1,5 @@
 {
-  "name": "spotr-workspace",
+  "name": "spotrc-workspace",
   "private": true,
   "description": "Control the Spotify desktop app from your terminal",
   "license": "MIT",
@@ -13,6 +13,8 @@
   },
   "workspaces": [
     "packages/core",
+    "packages/rpc",
+    "packages/mcp",
     "packages/cli"
   ],
   "scripts": {
@@ -20,7 +22,7 @@
     "lint": "oxlint --deny-warnings",
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm run test",
-    "build:bin": "bun build --compile packages/cli/src/main.ts --outfile dist/spotr",
+    "build:bin": "bun build --compile packages/cli/src/main.ts --outfile dist/spotrc && bun build --compile packages/jsonrpc/src/main.ts --outfile dist/spotrc-jsonrpc && bun build --compile packages/mcp/src/main.ts --outfile dist/spotrc-mcp",
     "prepare": "lefthook install"
   },
   "devDependencies": {

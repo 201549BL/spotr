@@ -37,7 +37,7 @@ import {
   toTrack
 } from "./raw.ts"
 
-// Every internal method spotr calls. `call` accepts only these, and
+// Every internal method spotrc calls. `call` accepts only these, and
 // doctor checks that each one exists, so the two can't drift apart.
 const uses = {
   PlayerAPI: [
@@ -66,7 +66,7 @@ const uses = {
 
 type Api = keyof typeof uses
 
-// Spotify's GraphQL queries spotr runs. doctor checks each is defined.
+// Spotify's GraphQL queries spotrc runs. doctor checks each is defined.
 const queries = ["searchModalResults"] as const
 
 // How one API looked to doctor.
@@ -113,7 +113,7 @@ export class Spotify extends Context.Service<Spotify, {
   readonly playSearch: (text: string) => Effect.Effect<PlayerStatus, SpotifyError>
   readonly watch: Stream.Stream<PlayerStatus, SpotifyError>
   readonly doctor: Effect.Effect<ReadonlyArray<Check>>
-}>()("spotr/Spotify") {
+}>()("spotrc/Spotify") {
   static readonly layer = Layer.effect(
     Spotify,
     Effect.gen(function* () {
@@ -237,7 +237,7 @@ export class Spotify extends Context.Service<Spotify, {
           const copies = queued.flatMap((item) => item.uri === uri && item.uid ? [{ uri, uid: item.uid }] : [])
 
           if (copies.length === 0) {
-            return yield* new NotFound({ what: `${uri} in your queue`, hint: "Run spotr queue to see what's queued." })
+            return yield* new NotFound({ what: `${uri} in your queue`, hint: "Run spotrc queue to see what's queued." })
           }
 
           yield* command("removeFromQueue", copies)
@@ -302,8 +302,8 @@ export class Spotify extends Context.Service<Spotify, {
           return yield* new NotFound({
             what: matches.length > 1 ? `A single playlist named "${playlist}"` : `Playlist "${playlist}"`,
             hint: matches.length > 1
-              ? "Several playlists share that name. Pass its URI from spotr playlist ls."
-              : "Run spotr playlist ls to see your playlists."
+              ? "Several playlists share that name. Pass its URI from spotrc playlist ls."
+              : "Run spotrc playlist ls to see your playlists."
           })
         })
 
@@ -371,8 +371,8 @@ export class Spotify extends Context.Service<Spotify, {
             return yield* new NotFound({
               what: matches.length > 1 ? `A single playlist named "${playlist}"` : `Playlist "${playlist}"`,
               hint: matches.length > 1
-                ? "Several playlists share that name. Pass its URI from spotr playlist ls."
-                : "Run spotr playlist ls to see your playlists."
+                ? "Several playlists share that name. Pass its URI from spotrc playlist ls."
+                : "Run spotrc playlist ls to see your playlists."
             })
           }
 
@@ -407,7 +407,7 @@ export class Spotify extends Context.Service<Spotify, {
           if (!found || matches.length > 1) {
             return yield* new NotFound({
               what: matches.length > 1 ? `A single device named "${device}"` : `Device "${device}"`,
-              hint: "Run spotr devices to see the devices Spotify can play on."
+              hint: "Run spotrc devices to see the devices Spotify can play on."
             })
           }
 
@@ -471,7 +471,7 @@ export class Spotify extends Context.Service<Spotify, {
         Effect.gen(function* () {
           const [best] = (yield* search(text, 10)).filter((hit) => playable(hit) && relevant(text)(hit))
 
-          if (!best) return yield* new NotFound({ what: `Anything playable for "${text}"`, hint: "Try other words, or spotr search to see what matches." })
+          if (!best) return yield* new NotFound({ what: `Anything playable for "${text}"`, hint: "Try other words, or spotrc search to see what matches." })
 
           return yield* play(best.uri)
         })
@@ -510,11 +510,11 @@ export class Spotify extends Context.Service<Spotify, {
         )
 
         return [
-          step("Spotify answers on the DevTools port", portOk, true, "Run spotr launch, or start Spotify with --remote-debugging-port."),
+          step("Spotify answers on the DevTools port", portOk, true, "Run spotrc launch, or start Spotify with --remote-debugging-port."),
           step("Spotify's window is open", pageOk, portOk, "Spotify may still be starting."),
-          step("spotr's agent reaches Spotify's internals", agentOk, pageOk, "Spotify didn't answer, or its internals have moved."),
+          step("spotrc's agent reaches Spotify's internals", agentOk, pageOk, "Spotify didn't answer, or its internals have moved."),
           ...inspections.map(({ api, result }) =>
-            step(`${api} has the ${uses[api].length === 1 ? "method" : `${uses[api].length} methods`} spotr uses`, result.kind === "ok", agentOk, "detail" in result ? result.detail : "")
+            step(`${api} has the ${uses[api].length === 1 ? "method" : `${uses[api].length} methods`} spotrc uses`, result.kind === "ok", agentOk, "detail" in result ? result.detail : "")
           ),
           step("Spotify's search query is defined", missingQueries.length === 0, agentOk, `missing ${missingQueries.join(", ")}`)
         ]

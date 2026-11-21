@@ -13,7 +13,7 @@ import {
   type SpotifyError,
   type Track,
   type VolumeStatus
-} from "spotr-core"
+} from "@spotrc/core"
 import { Console, Effect, Stream } from "effect"
 import { Json } from "./settings.ts"
 
@@ -110,7 +110,7 @@ export const devicesText = (devices: ReadonlyArray<Device>) =>
     .map((device) => `${device.active ? "▶" : " "} ${device.name} · ${device.type}${device.local ? " · this computer" : ""}`)
     .join("\n")
 
-// One line per change, for spotr watch.
+// One line per change, for spotrc watch.
 export const watchText = ({ track, paused }: PlayerStatus) =>
   track ? `${paused ? "⏸" : "▶"} ${trackLine(track)}` : "Nothing playing"
 

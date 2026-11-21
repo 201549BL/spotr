@@ -1,7 +1,7 @@
 import { Effect, Layer, SchemaAST } from "effect"
 import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai"
 import { type Rpc, type RpcGroup, RpcSchema, RpcTest } from "effect/rpc"
-import { describe, type Operation, Spotr } from "spotr-core"
+import { describe, type Operation, Spotrc } from "@spotrc/core"
 
 type Stream = {
   [Tag in Operation["_tag"]]: [Rpc.IsStream<Operation, Tag>] extends [never] ? never : Tag
@@ -9,10 +9,10 @@ type Stream = {
 
 const isStream = (rpc: Operation): rpc is Rpc.ExtractTag<Operation, Stream> => RpcSchema.isStreamSchema(rpc.successSchema)
 
-const streams = Array.from(Spotr.requests.values()).flatMap((rpc) => isStream(rpc) ? [rpc._tag] : [])
+const streams = Array.from(Spotrc.requests.values()).flatMap((rpc) => isStream(rpc) ? [rpc._tag] : [])
 
 // MCP tools answer once, so stream operations such as watch have no tool.
-const Unary = Spotr.omit(...streams)
+const Unary = Spotrc.omit(...streams)
 
 const unary = Array.from(Unary.requests.values())
 
@@ -50,4 +50,4 @@ export const registrations: Layer.Layer<never, never, McpServer.McpServer | Rpc.
 
 export const protocols = [McpProtocol.v2025_11_25, McpProtocol.v2025_06_18, McpProtocol.v2025_03_26] as const
 
-export const mcp = McpServer.layerStdio({ name: "spotr", version: "0.1.0", protocols, registrations })
+export const mcp = McpServer.layerStdio({ name: "spotrc", version: "0.1.0", protocols, registrations })

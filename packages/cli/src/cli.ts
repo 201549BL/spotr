@@ -1,5 +1,5 @@
-import { ChecksFailed, Client, describe, DevToolsPort, live, parseSeek, parseVolumeChange, SpotifyUri, toSpotifyUri } from "spotr-core"
-import { Console, Effect, Layer, Option, Schema } from "effect"
+import { ChecksFailed, Client, describe, DevToolsPort, live, parseSeek, parseVolumeChange, SpotifyUri, toSpotifyUri } from "@spotrc/core"
+import { Effect, Layer, Option, Schema } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
 import {
   searchText,
@@ -20,8 +20,6 @@ import {
   statusText,
   volumeText
 } from "./render.ts"
-import { mcp as mcpServer } from "./mcp.ts"
-import { openRpc, serve as server } from "./server.ts"
 import { Json, Port } from "./settings.ts"
 
 const uriArgument = (description: string) =>
@@ -246,23 +244,11 @@ const toggle = Command.make("toggle", {}, () =>
   Client.use((client) => client.toggle()).pipe(present(statusText))
 ).pipe(Command.withDescription(describe("toggle")))
 
-const serve = Command.make("serve", {}, () => server).pipe(
-  Command.withDescription("Serve every operation as JSON-RPC 2.0 on stdin and stdout, one message per line")
-)
-
-const mcp = Command.make("mcp", {}, () => Layer.launch(mcpServer)).pipe(
-  Command.withDescription("Serve every operation as an MCP tool on stdin and stdout")
-)
-
-const schema = Command.make("schema", {}, () => Console.log(JSON.stringify(openRpc, null, 2))).pipe(
-  Command.withDescription("Print the OpenRPC document for spotr serve")
-)
-
 // The core reads the DevTools port from a service; the CLI fills it in
-// from --port (or SPOTR_PORT).
+// from --port (or SPOTRC_PORT).
 const devToolsPort = Layer.effect(DevToolsPort, Port)
 
-export const spotr = Command.make("spotr").pipe(
+export const spotrc = Command.make("spotrc").pipe(
   Command.withSubcommands([
     status,
     search,
@@ -285,10 +271,7 @@ export const spotr = Command.make("spotr").pipe(
     unmute,
     watch,
     launch,
-    doctor,
-    serve,
-    mcp,
-    schema
+    doctor
   ]),
   Command.provide(Client.layer.pipe(Layer.provideMerge(live), Layer.provideMerge(devToolsPort))),
   Command.withGlobalFlags([Json, Port]),

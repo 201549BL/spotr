@@ -22,9 +22,9 @@ const track = { uri: Schema.optionalKey(SpotifyUri) }
 
 const playlist = Schema.String.annotate({ description: "The playlist's name or URI" })
 
-// Every operation spotr offers. The CLI, the JSON-RPC server, the MCP
+// Every operation spotrc offers. The CLI, the JSON-RPC server, the MCP
 // server and the OpenRPC document are all built from this table.
-export const Spotr = RpcGroup.make(
+export const Spotrc = RpcGroup.make(
   op("status", "Show what's playing", { success: PlayerStatus }),
   op("play", "Play something by URI, link or search, or resume", {
     payload: {
@@ -89,7 +89,7 @@ export const Spotr = RpcGroup.make(
   // Failed checks are part of the answer, not an error, so clients get
   // the whole list.
   Rpc.make("doctor", { success: Schema.Array(Check) })
-    .annotate(OpenRpc.Description, "Check that spotr can reach and drive Spotify")
+    .annotate(OpenRpc.Description, "Check that spotrc can reach and drive Spotify")
     .annotate(OpenRpc.Errors, []),
   op("launch", "Start Spotify with its DevTools port open (macOS)", { success: LaunchResult })
 ).annotate(OpenRpc.Errors, [{
@@ -97,7 +97,7 @@ export const Spotr = RpcGroup.make(
   message: "code is the error's exit code (2 to 7). data is one of the SpotifyError components: its _tag, fields, message, hint and detail"
 }])
 
-export type Operation = RpcGroup.Rpcs<typeof Spotr>
+export type Operation = RpcGroup.Rpcs<typeof Spotrc>
 
 export const describe = (tag: Operation["_tag"]) =>
-  Context.getOrUndefined(Spotr.requests.get(tag)?.annotations ?? Context.empty(), OpenRpc.Description) ?? ""
+  Context.getOrUndefined(Spotrc.requests.get(tag)?.annotations ?? Context.empty(), OpenRpc.Description) ?? ""

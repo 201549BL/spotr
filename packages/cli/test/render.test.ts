@@ -1,4 +1,4 @@
-import { Check, CreatedPlaylist, DeletedPlaylist, Device, LikeResult, PlayerStatus, Playlist, PlaylistAddResult, Queue, SearchResult, SpotifyUri, Track, Volume, VolumeStatus } from "spotr-core"
+import { Check, CreatedPlaylist, DeletedPlaylist, Device, LikeResult, PlayerStatus, Playlist, PlaylistAddResult, Queue, SearchResult, SpotifyUri, Track, Volume, VolumeStatus } from "@spotrc/core"
 import { assert, describe, it } from "@effect/vitest"
 import { searchText, volumeText, createdText, deletedText, devicesText, doctorText, launchText, likeText, watchText, playlistAddText, playlistsText, queueText, repeatText, shuffleText, statusText } from "../src/render.ts"
 

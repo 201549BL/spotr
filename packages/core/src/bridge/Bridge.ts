@@ -25,4 +25,4 @@ export class Bridge extends Context.Service<Bridge, {
   readonly inspectQueries: (
     names: ReadonlyArray<string>
   ) => Effect.Effect<ReadonlyArray<string>, BridgeError | InternalApiChanged>
-}>()("spotr/Bridge") {}
+}>()("spotrc/Bridge") {}

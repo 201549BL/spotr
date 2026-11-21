@@ -1,0 +1,19 @@
+{
+  "name": "@spotrc/jsonrpc",
+  "version": "0.1.0",
+  "description": "Serve spotrc's operations as JSON-RPC 2.0 on stdio, with an OpenRPC document",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "spotrc-jsonrpc": "src/main.ts"
+  },
+  "exports": {
+    ".": "./src/server.ts"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.1.4",
+    "effect": "4.1.4",
+    "@spotrc/core": "0.1.0"
+  }
+}
