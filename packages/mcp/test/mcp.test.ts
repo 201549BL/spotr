@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { McpTest } from "effect/ai"
 import { protocols, registrations } from "../src/mcp.ts"
-import { fake } from "@spotrc/core"
+import { fake } from "@spotrc/core/testing"
 
 const connect = McpTest.makeClient(registrations.pipe(Layer.provide(fake)), { protocols })
 
@@ -93,7 +93,7 @@ describe("spotrc mcp", () => {
         [{
           type: "text",
           text: "{\"_tag\":\"NotFound\",\"what\":\"Device \\\"Nowhere\\\"\"," +
-            "\"hint\":\"Run spotrc devices to see the devices Spotify can play on.\"," +
+            "\"hint\":\"List the devices to see the ones Spotify can play on.\"," +
             "\"message\":\"Device \\\"Nowhere\\\" wasn't found\"," +
             "\"detail\":\"spotrc looked it up in Spotify and got no match\"}"
         }]

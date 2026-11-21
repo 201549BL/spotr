@@ -146,7 +146,7 @@ describe("playlist create and delete", () => {
       const client = yield* Client
       const unconfirmed = yield* Effect.flip(client.deletePlaylist({ playlist: "road trip", yes: false }))
 
-      assert.strictEqual(unconfirmed.message, "spotrc won't delete \"Road Trip\" without --yes")
+      assert.strictEqual(unconfirmed.message, "spotrc won't delete \"Road Trip\" without confirmation")
       assert.strictEqual((yield* client.playlists()).length, 5)
 
       const deleted = yield* client.deletePlaylist({ playlist: "road trip", yes: true })

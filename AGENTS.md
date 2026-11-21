@@ -27,11 +27,12 @@ Run from the repository root.
 
 `packages/core/src/` is layered. Each layer imports only from the layers below it, and every layer may use `model/`.
 
-- `index.ts` is the package's public API: `Client`, `live`, `fake`, the operations table and the model. Anything an adapter imports is exported here.
+- `index.ts` is the package's public API: `Client`, `live`, the operations table and the model. Anything an adapter imports is exported here.
+- `testing.ts` is the `@spotrc/core/testing` entry: `FakeBridge`, `fake` and `fakeOn`, for tests only. Production code never imports it.
 - `api/` is the domain API, what adapters call.
   - `operations.ts` is the operations table: an `RpcGroup` with one `Rpc` per operation, carrying its payload, success and error schemas and its description.
   - `handlers.ts` implements every operation on `Internals` and `Launcher`: waiting for Spotify to show a change, resolving names to playlists and devices, the playing-track defaults, and the domain errors.
-  - `Client.ts` wires it up. `live` runs the handlers on the real app, `fake` and `fakeOn` on a `FakeBridge`, and `Client` calls them in-process.
+  - `Client.ts` wires it up. `live` runs the handlers on the real app, and `Client` calls them in-process.
 - `locator/` is everything that knows Spotify's internals.
   - `Internals.ts` is Spotify's internal APIs as typed calls (`player.pause`, `library.add`, …). Its `uses` table lists every internal method spotrc calls, and `queries` every GraphQL query. `call` is typed against `uses`, and `checks` (what `doctor` returns) verifies both.
   - `raw.ts` holds the shapes Spotify's internal APIs return, and turns them into model types.
@@ -56,7 +57,7 @@ Run from the repository root.
 
 `packages/mcp/src/mcp.ts` derives one MCP tool per operation from the table. `main.ts` is the executable.
 
-Each package's `test/` holds its tests. The adapter tests run on core's `fake`.
+Each package's `test/` holds its tests. The adapter tests run on `fake` from `@spotrc/core/testing`.
 
 `scripts/commit-msg.ts` is the commit-msg hook that checks for conventional commits. `tools/oxlint/anti-slop/` is vendored. See its `UPSTREAM.md` before changing it.
 
@@ -65,6 +66,7 @@ Each package's `test/` holds its tests. The adapter tests run on core's `fake`.
 - Verify every Effect API against the JSDoc in `node_modules/effect/src` before using it. The installed source is the v4 truth. v3 names from memory, such as `Context.Tag`, `@effect/cli` and `catchAll`, are wrong here.
 - Spotify logic belongs in `packages/core`. Adapters only turn their input into operations and present the results, so any other interface can reuse core unchanged.
 - Add an operation to the table in `operations.ts`, any new internal call to `Internals`, then its handler in `handlers.ts`, then its CLI command. `spotrc-jsonrpc` and `spotrc-mcp` pick it up from the table.
+- Error messages and hints in core name operations, not CLI commands or flags, because every adapter shows them. An adapter that needs its own wording, like the CLI's `--yes`, rewrites it where it renders errors.
 - Operation payloads are domain values. Parsing CLI strings such as `1:30`, `+10` or links stays in the CLI command.
 - An operation's description lives in the table. A CLI command that maps to exactly one operation uses `describe(tag)` for its help.
 - Errors cross the protocol through the `SpotifyError` schema in `errors.ts`, which copies `message`, `hint` and `detail` into fields. Add a new error class to that union.

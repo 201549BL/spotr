@@ -95,7 +95,7 @@ Payloads are structured: `seek` takes `{ relative, ms }` and `setVolume` takes `
 A failed call returns a JSON-RPC error. `code` is the error's exit code from the table below, `message` is spotrc's message, and `data` carries the error's `_tag`, its fields, `message`, `hint` and `detail`, the same text the CLI prints:
 
 ```json
-{"jsonrpc":"2.0","id":1,"error":{"code":3,"message":"Spotify isn't reachable on port 9222","data":{"_tag":"ClientNotRunning","port":9222,"reason":"port","message":"Spotify isn't reachable on port 9222","hint":"Run spotrc launch, or start Spotify with --remote-debugging-port=9222.","detail":"Nothing answered on http://127.0.0.1:9222/json/list"}}}
+{"jsonrpc":"2.0","id":1,"error":{"code":3,"message":"Spotify isn't reachable on port 9222","data":{"_tag":"ClientNotRunning","port":9222,"reason":"port","message":"Spotify isn't reachable on port 9222","hint":"Launch Spotify through spotrc, or start it with --remote-debugging-port=9222.","detail":"Nothing answered on http://127.0.0.1:9222/json/list"}}}
 ```
 
 A request spotrc can't run gets JSON-RPC's own codes: `-32700` for a line that isn't JSON, `-32600` for JSON that isn't a request, `-32601` for an unknown method, and `-32602` for params that don't fit the operation, with the problem in `message`.

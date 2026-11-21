@@ -1,5 +1,5 @@
-import { ChecksFailed, Client, describe, DevToolsPort, live, parseSeek, parseVolumeChange, SpotifyUri, toSpotifyUri } from "@spotrc/core"
-import { Effect, Layer, Option, Schema } from "effect"
+import { Client, describe, DevToolsPort, live, parseSeek, parseVolumeChange, SpotifyUri, toSpotifyUri } from "@spotrc/core"
+import { Effect, Layer, Option, Runtime, Schema } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
 import {
   searchText,
@@ -21,6 +21,19 @@ import {
   volumeText
 } from "./render.ts"
 import { Json, Port } from "./settings.ts"
+
+
+// doctor already printed which checks failed, so this only sets the exit
+// code.
+class ChecksFailed extends Schema.TaggedError<
+  ChecksFailed,
+  { readonly brand: unique symbol }
+>()("ChecksFailed", {
+  failed: Schema.Int
+}) {
+  readonly [Runtime.errorExitCode] = 6
+  readonly [Runtime.errorReported] = false
+}
 
 const uriArgument = (description: string) =>
   Argument.String("uri").pipe(

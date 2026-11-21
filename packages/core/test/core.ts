@@ -1,5 +1,6 @@
 import { Layer } from "effect"
-import { Client, fakeOn } from "../src/api/Client.ts"
+import { Client } from "../src/api/Client.ts"
+import { fakeOn } from "../src/testing.ts"
 import type { Bridge } from "../src/locator/Bridge.ts"
 
 // A Client calling the operations on `bridge`.

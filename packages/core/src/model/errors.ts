@@ -20,7 +20,7 @@ export class ClientNotRunning extends Schema.TaggedError<
 
   get hint() {
     return this.reason === "port"
-      ? `Run spotrc launch, or start Spotify with --remote-debugging-port=${this.port}.`
+      ? `Launch Spotify through spotrc, or start it with --remote-debugging-port=${this.port}.`
       : "Spotify may still be starting. Wait a moment and try again."
   }
 
@@ -108,7 +108,7 @@ export class SpotifyWithoutDebugPort extends Schema.TaggedError<
   }
 
   get hint() {
-    return "Quit Spotify, then run spotrc launch again."
+    return "Quit Spotify, then launch it through spotrc again."
   }
 
   get detail() {
@@ -138,18 +138,6 @@ export class LaunchFailed extends Schema.TaggedError<
   }
 }
 
-// doctor already printed which checks failed, so this only sets the exit
-// code.
-export class ChecksFailed extends Schema.TaggedError<
-  ChecksFailed,
-  { readonly brand: unique symbol }
->()("ChecksFailed", {
-  failed: Schema.Int
-}) {
-  readonly [Runtime.errorExitCode] = 6
-  readonly [Runtime.errorReported] = false
-}
-
 // Spotify accepted the request but didn't do it. Several of its methods
 // report failure this way instead of throwing.
 export class SpotifyRefused extends Schema.TaggedError<
@@ -174,7 +162,8 @@ export class SpotifyRefused extends Schema.TaggedError<
   }
 }
 
-// Deleting needs an explicit --yes, so a typo can't remove a playlist.
+// Deleting needs explicit confirmation, so a typo can't remove a playlist.
+// Adapters word the confirmation their own way, e.g. the CLI's --yes.
 export class NeedsConfirmation extends Schema.TaggedError<
   NeedsConfirmation,
   { readonly brand: unique symbol }
@@ -185,11 +174,11 @@ export class NeedsConfirmation extends Schema.TaggedError<
   readonly [Runtime.errorReported] = false
 
   get message() {
-    return `spotrc won't ${this.action} without --yes`
+    return `spotrc won't ${this.action} without confirmation`
   }
 
   get hint() {
-    return "Run the command again with --yes if you're sure."
+    return "Ask again with yes set if you're sure."
   }
 
   get detail() {

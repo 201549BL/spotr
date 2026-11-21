@@ -1,8 +1,6 @@
-export { Client, fake, fakeOn, live } from "./api/Client.ts"
+export { Client, live } from "./api/Client.ts"
 
 export { describe, type Operation, Spotrc } from "./api/operations.ts"
-
-export { FakeBridge, sampleQueue } from "./locator/FakeBridge.ts"
 
 export { Check } from "./model/Check.ts"
 

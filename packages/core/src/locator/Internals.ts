@@ -266,7 +266,7 @@ export class Internals extends Context.Service<Internals, {
         )
 
         return [
-          step("Spotify answers on the DevTools port", portOk, true, "Run spotrc launch, or start Spotify with --remote-debugging-port."),
+          step("Spotify answers on the DevTools port", portOk, true, "Launch Spotify through spotrc, or start it with --remote-debugging-port."),
           step("Spotify's window is open", pageOk, portOk, "Spotify may still be starting."),
           step("spotrc's agent reaches Spotify's internals", agentOk, pageOk, "Spotify didn't answer, or its internals have moved."),
           ...inspections.map(({ api, result }) =>

@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { type Cause, Effect, type Schema, Fiber, Layer, Queue, Sink, Stdio, Stream } from "effect"
 import { serve } from "../src/server.ts"
-import { fake } from "@spotrc/core"
+import { fake } from "@spotrc/core/testing"
 
 const encoder = new TextEncoder()
 
@@ -59,7 +59,7 @@ describe("spotrc serve", () => {
         yield* server.next,
         "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":5,\"message\":\"Device \\\"Nowhere\\\" wasn't found\"," +
           "\"data\":{\"_tag\":\"NotFound\",\"what\":\"Device \\\"Nowhere\\\"\"," +
-          "\"hint\":\"Run spotrc devices to see the devices Spotify can play on.\"," +
+          "\"hint\":\"List the devices to see the ones Spotify can play on.\"," +
           "\"message\":\"Device \\\"Nowhere\\\" wasn't found\"," +
           "\"detail\":\"spotrc looked it up in Spotify and got no match\"}}}"
       )

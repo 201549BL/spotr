@@ -14,7 +14,7 @@ import {
   type Track,
   type VolumeStatus
 } from "@spotrc/core"
-import { Console, Effect, Stream } from "effect"
+import { Console, Effect, Predicate, Stream } from "effect"
 import { Json } from "./settings.ts"
 
 // Commands return data. This is the one place that decides how it
@@ -44,11 +44,23 @@ export const presentEach = <A>(toText: (value: A) => string) =>
       )
     })
 
-const errorText = (error: SpotifyError) =>
-  `error:  ${error.message}\nhint:   ${error.hint}\ndetail: ${error.detail}`
+// Core words a confirmation neutrally; on the command line it is --yes.
+const explain = (error: SpotifyError) =>
+  Predicate.isTagged(error, "NeedsConfirmation")
+    ? {
+      message: `spotrc won't ${error.action} without --yes`,
+      hint: "Run the command again with --yes if you're sure.",
+      detail: error.detail
+    }
+    : { message: error.message, hint: error.hint, detail: error.detail }
 
-const errorJson = (error: SpotifyError) =>
-  JSON.stringify({ error: { _tag: error._tag, message: error.message, hint: error.hint, detail: error.detail } })
+const errorText = (error: SpotifyError) => {
+  const { message, hint, detail } = explain(error)
+
+  return `error:  ${message}\nhint:   ${hint}\ndetail: ${detail}`
+}
+
+const errorJson = (error: SpotifyError) => JSON.stringify({ error: { _tag: error._tag, ...explain(error) } })
 
 export const statusText = (status: PlayerStatus) => {
   const { track, paused } = status

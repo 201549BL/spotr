@@ -54,7 +54,7 @@ export const handlers = Spotrc.toLayer(Effect.gen(function* () {
     Effect.gen(function* () {
       const [best] = (yield* search(text, 10)).filter((hit) => playable(hit) && relevant(text)(hit))
 
-      if (!best) return yield* new NotFound({ what: `Anything playable for "${text}"`, hint: "Try other words, or spotrc search to see what matches." })
+      if (!best) return yield* new NotFound({ what: `Anything playable for "${text}"`, hint: "Try other words, or search to see what matches." })
 
       return yield* play(best.uri)
     })
@@ -103,8 +103,8 @@ export const handlers = Spotrc.toLayer(Effect.gen(function* () {
       return yield* new NotFound({
         what: matches.length > 1 ? `A single playlist named "${name}"` : `Playlist "${name}"`,
         hint: matches.length > 1
-          ? "Several playlists share that name. Pass its URI from spotrc playlist ls."
-          : "Run spotrc playlist ls to see your playlists."
+          ? "Several playlists share that name. Pass its URI, which the playlist list shows."
+          : "List your playlists to see their names."
       })
     })
 
@@ -176,7 +176,7 @@ export const handlers = Spotrc.toLayer(Effect.gen(function* () {
     removeFromQueue: ({ uri }) =>
       Effect.gen(function* () {
         if ((yield* player.removeFromQueue(uri)) === 0) {
-          return yield* new NotFound({ what: `${uri} in your queue`, hint: "Run spotrc queue to see what's queued." })
+          return yield* new NotFound({ what: `${uri} in your queue`, hint: "Show the queue to see what's queued." })
         }
 
         return yield* pollUntil(player.queue, (now) => now.queued.every((track) => track.uri !== uri))
@@ -244,7 +244,7 @@ export const handlers = Spotrc.toLayer(Effect.gen(function* () {
         if (!found || matches.length > 1) {
           return yield* new NotFound({
             what: matches.length > 1 ? `A single device named "${device}"` : `Device "${device}"`,
-            hint: "Run spotrc devices to see the devices Spotify can play on."
+            hint: "List the devices to see the ones Spotify can play on."
           })
         }
 
