@@ -25,6 +25,10 @@ npm link
 
 `npm link` puts a `spotr` command on your PATH. It points at your clone, so keep it where it is.
 
+### Standalone binary
+
+`npm run build:bin` builds `dist/spotr`, a single file with the Bun runtime inside, so it runs without Node. It's about 86 MB and starts in about 50 ms. Copy it anywhere on your PATH. Other programs can run `spotr <command> --json` and parse the output.
+
 ## Start Spotify with its DevTools port
 
 Spotify only accepts spotr's connection when it starts with a DevTools port open. Quit Spotify, then run:
