@@ -1,21 +1,21 @@
 import { Clock, Context, Effect, Layer, Schedule, type Schema, Stream } from "effect"
-import { Bridge } from "../bridge/Bridge.ts"
-import { Check } from "../domain/Check.ts"
-import { playable, relevant, type SearchResult } from "../domain/SearchResult.ts"
-import type { Device } from "../domain/Device.ts"
-import { NeedsConfirmation, NotFound, type SpotifyError, SpotifyRefused } from "../domain/errors.ts"
-import type { PlayerStatus, Repeat } from "../domain/PlayerStatus.ts"
+import { Bridge } from "../locator/Bridge.ts"
+import { Check } from "../model/Check.ts"
+import { playable, relevant, type SearchResult } from "../model/SearchResult.ts"
+import type { Device } from "../model/Device.ts"
+import { NeedsConfirmation, NotFound, type SpotifyError, SpotifyRefused } from "../model/errors.ts"
+import type { PlayerStatus, Repeat } from "../model/PlayerStatus.ts"
 import {
   CreatedPlaylist,
   DeletedPlaylist,
   LikeResult,
   type Playlist,
   PlaylistAddResult
-} from "../domain/Playlist.ts"
-import { Queue } from "../domain/Queue.ts"
-import type { SeekTarget } from "../domain/Seek.ts"
-import { likedSongs, type SpotifyUri } from "../domain/Track.ts"
-import { type VolumeChange, VolumeStatus } from "../domain/Volume.ts"
+} from "../model/Playlist.ts"
+import { Queue } from "../model/Queue.ts"
+import type { SeekTarget } from "../model/Seek.ts"
+import { likedSongs, type SpotifyUri } from "../model/Track.ts"
+import { type VolumeChange, VolumeStatus } from "../model/Volume.ts"
 import {
   blameUpdate,
   decodeContains,
@@ -35,7 +35,7 @@ import {
   toSearchResults,
   toStatus,
   toTrack
-} from "./raw.ts"
+} from "../locator/raw.ts"
 
 // Every internal method spotrc calls. `call` accepts only these, and
 // doctor checks that each one exists, so the two can't drift apart.

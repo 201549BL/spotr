@@ -1,5 +1,5 @@
 import { assert, beforeEach, describe, it } from "@effect/vitest"
-import { type Agent, installAgent } from "../src/page/agent.ts"
+import { type Agent, installAgent } from "../src/locator/agent.ts"
 
 // Runs the agent from its source text, the way CdpBridge sends it to
 // Spotify. Any reference to something outside the function fails here.

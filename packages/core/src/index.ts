@@ -1,35 +1,35 @@
-export { Bridge } from "./bridge/Bridge.ts"
+export { Bridge } from "./locator/Bridge.ts"
 
-export { CdpBridge } from "./bridge/CdpBridge.ts"
+export { CdpBridge } from "./locator/CdpBridge.ts"
 
-export { FakeBridge, sampleQueue } from "./bridge/FakeBridge.ts"
+export { FakeBridge, sampleQueue } from "./locator/FakeBridge.ts"
 
-export { defaultPort, DevToolsPort } from "./DevToolsPort.ts"
+export { defaultPort, DevToolsPort } from "./transport/DevToolsPort.ts"
 
-export { Check } from "./domain/Check.ts"
+export { Check } from "./model/Check.ts"
 
-export { Device } from "./domain/Device.ts"
+export { Device } from "./model/Device.ts"
 
-export * from "./domain/errors.ts"
+export * from "./model/errors.ts"
 
-export { PlayerStatus, Repeat } from "./domain/PlayerStatus.ts"
+export { PlayerStatus, Repeat } from "./model/PlayerStatus.ts"
 
-export { CreatedPlaylist, DeletedPlaylist, LikeResult, Playlist, PlaylistAddResult } from "./domain/Playlist.ts"
+export { CreatedPlaylist, DeletedPlaylist, LikeResult, Playlist, PlaylistAddResult } from "./model/Playlist.ts"
 
-export { Queue } from "./domain/Queue.ts"
+export { Queue } from "./model/Queue.ts"
 
-export { playable, relevant, SearchKind, SearchResult } from "./domain/SearchResult.ts"
+export { playable, relevant, SearchKind, SearchResult } from "./model/SearchResult.ts"
 
-export { formatTime, parseSeek, type SeekTarget } from "./domain/Seek.ts"
+export { formatTime, parseSeek, type SeekTarget } from "./model/Seek.ts"
 
-export { likedSongs, type PlayTarget, SpotifyUri, toPlayTarget, toSpotifyUri, Track } from "./domain/Track.ts"
+export { likedSongs, type PlayTarget, SpotifyUri, toPlayTarget, toSpotifyUri, Track } from "./model/Track.ts"
 
-export { parseVolumeChange, Volume, type VolumeChange, VolumeStatus } from "./domain/Volume.ts"
+export { parseVolumeChange, Volume, type VolumeChange, VolumeStatus } from "./model/Volume.ts"
 
-export { Client, fake, handlers, live } from "./handlers.ts"
+export { Client, fake, handlers, live } from "./api/handlers.ts"
 
-export { Launcher, LaunchResult } from "./spotify/Launcher.ts"
+export { Launcher, LaunchResult } from "./transport/Launcher.ts"
 
-export { describe, type Operation, Spotrc } from "./operations.ts"
+export { describe, type Operation, Spotrc } from "./api/operations.ts"
 
-export { Spotify } from "./spotify/Spotify.ts"
+export { Spotify } from "./api/Spotify.ts"

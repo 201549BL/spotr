@@ -1,5 +1,5 @@
 import { Context, type Effect, type Schema } from "effect"
-import type { BridgeError, InternalApiChanged } from "../domain/errors.ts"
+import type { BridgeError, InternalApiChanged } from "../model/errors.ts"
 
 // The seam to Spotify's internal APIs.
 export class Bridge extends Context.Service<Bridge, {

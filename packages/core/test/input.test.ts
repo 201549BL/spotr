@@ -1,8 +1,8 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
-import { formatTime, parseSeek } from "../src/domain/Seek.ts"
-import { SpotifyUri, toSpotifyUri } from "../src/domain/Track.ts"
-import { parseVolumeChange } from "../src/domain/Volume.ts"
+import { formatTime, parseSeek } from "../src/model/Seek.ts"
+import { SpotifyUri, toSpotifyUri } from "../src/model/Track.ts"
+import { parseVolumeChange } from "../src/model/Volume.ts"
 
 describe("parseSeek", () => {
   it("reads absolute and relative positions", () => {

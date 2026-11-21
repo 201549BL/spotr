@@ -1,8 +1,8 @@
 import { Context, Effect, Layer, Schedule, Schema } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { ClientNotRunning, LaunchFailed, type SpotifyError, SpotifyWithoutDebugPort } from "../domain/errors.ts"
-import { DevToolsPort } from "../DevToolsPort.ts"
-import { Spotify } from "./Spotify.ts"
+import { ClientNotRunning, LaunchFailed, type SpotifyError, SpotifyWithoutDebugPort } from "../model/errors.ts"
+import { DevToolsPort } from "./DevToolsPort.ts"
+import { Spotify } from "../api/Spotify.ts"
 
 export class LaunchResult extends Schema.Class<LaunchResult, { readonly brand: unique symbol }>("LaunchResult")({
   started: Schema.Boolean,

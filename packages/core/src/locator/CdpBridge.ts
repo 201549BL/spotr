@@ -1,11 +1,11 @@
 import { Effect, Layer, Schema } from "effect"
 import { HttpClient, HttpClientResponse } from "effect/http"
 import { Socket } from "effect/socket"
-import { BridgeTimeout, ClientNotRunning, InternalApiChanged } from "../domain/errors.ts"
-import { installAgent } from "../page/agent.ts"
-import { DevToolsPort } from "../DevToolsPort.ts"
+import { BridgeTimeout, ClientNotRunning, InternalApiChanged } from "../model/errors.ts"
+import { installAgent } from "./agent.ts"
+import { DevToolsPort } from "../transport/DevToolsPort.ts"
 import { Bridge } from "./Bridge.ts"
-import * as Cdp from "./Cdp.ts"
+import * as Cdp from "../transport/Cdp.ts"
 
 // What Chromium's DevTools endpoint lists at /json/list.
 const Targets = Schema.Array(Schema.Struct({

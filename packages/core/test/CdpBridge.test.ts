@@ -2,9 +2,9 @@ import { assert, describe, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { HttpClient, HttpClientResponse } from "effect/http"
 import { Socket } from "effect/socket"
-import { Bridge } from "../src/bridge/Bridge.ts"
-import { CdpBridge } from "../src/bridge/CdpBridge.ts"
-import { DevToolsPort } from "../src/DevToolsPort.ts"
+import { Bridge } from "../src/locator/Bridge.ts"
+import { CdpBridge } from "../src/locator/CdpBridge.ts"
+import { DevToolsPort } from "../src/transport/DevToolsPort.ts"
 
 // A DevTools endpoint whose /json/list answers with `body`.
 const devToolsAnswering = (body: string) =>

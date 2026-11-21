@@ -1,11 +1,11 @@
 import { Effect, Option, Schema } from "effect"
-import { Device } from "../domain/Device.ts"
-import { InternalApiChanged, type SpotifyError } from "../domain/errors.ts"
-import { Playlist } from "../domain/Playlist.ts"
-import { SearchResult } from "../domain/SearchResult.ts"
-import { PlayerStatus, type Repeat } from "../domain/PlayerStatus.ts"
-import { SpotifyUri, Track } from "../domain/Track.ts"
-import { Volume } from "../domain/Volume.ts"
+import { Device } from "../model/Device.ts"
+import { InternalApiChanged, type SpotifyError } from "../model/errors.ts"
+import { Playlist } from "../model/Playlist.ts"
+import { SearchResult } from "../model/SearchResult.ts"
+import { PlayerStatus, type Repeat } from "../model/PlayerStatus.ts"
+import { SpotifyUri, Track } from "../model/Track.ts"
+import { Volume } from "../model/Volume.ts"
 
 // The shapes Spotify's internal APIs return, and how they become domain
 // types. Everything here is decoded, never trusted.
