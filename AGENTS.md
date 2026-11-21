@@ -14,15 +14,16 @@ TypeScript CLI that controls the Spotify desktop app over Chrome DevTools Protoc
 ## Layout
 
 - `src/main.ts` is the entry point and the only place a runtime is created.
-- `src/cli.ts` holds the command tree and the layer wiring.
-- `src/render.ts` turns command results and errors into text or JSON.
+- `src/cli/commands.ts` holds the command tree and the layer wiring.
+- `src/cli/render.ts` turns command results and errors into text or JSON.
 - `src/settings.ts` defines the global `--json` and `--port` settings.
-- `src/domain/` holds the Schema models, tagged errors, and pure helpers such as seek parsing.
-- `src/spotify/Spotify.ts` is the service commands use. Its `uses` table lists every internal method spotr calls, and `queries` every GraphQL query. `call` is typed against `uses`, and `doctor` checks both.
-- `src/spotify/raw.ts` holds the shapes Spotify's internal APIs return, and turns them into domain types.
-- `src/spotify/Launcher.ts` starts the Spotify app with the DevTools port open, through `effect/process`.
-- `src/bridge/` is the seam to Spotify. `Bridge.ts` is the interface, `CdpBridge.ts` and `Cdp.ts` reach the real app, and `FakeBridge.ts` stands in for it in tests.
-- `src/page/agent.ts` runs inside Spotify's page. It is sent as source text, so its function body must be self-contained.
+- `src/core/` is everything that reaches Spotify. Adapters such as `src/cli/` sit on top of it.
+- `src/core/domain/` holds the Schema models, tagged errors, and pure helpers such as seek parsing.
+- `src/core/spotify/Spotify.ts` is the service commands use. Its `uses` table lists every internal method spotr calls, and `queries` every GraphQL query. `call` is typed against `uses`, and `doctor` checks both.
+- `src/core/spotify/raw.ts` holds the shapes Spotify's internal APIs return, and turns them into domain types.
+- `src/core/spotify/Launcher.ts` starts the Spotify app with the DevTools port open, through `effect/process`.
+- `src/core/bridge/` is the seam to Spotify. `Bridge.ts` is the interface, `CdpBridge.ts` and `Cdp.ts` reach the real app, and `FakeBridge.ts` stands in for it in tests.
+- `src/core/page/agent.ts` runs inside Spotify's page. It is sent as source text, so its function body must be self-contained.
 - `test/` holds Vitest tests. Most run `Spotify` on `FakeBridge`. `agent.test.ts` runs the agent from its source text against a fake page.
 - `scripts/commit-msg.ts` is the commit-msg hook that checks for conventional commits.
 - `tools/oxlint/anti-slop/` is vendored. See its `UPSTREAM.md` before changing it.
@@ -30,10 +31,10 @@ TypeScript CLI that controls the Spotify desktop app over Chrome DevTools Protoc
 ## Rules
 
 - Verify every Effect API against the JSDoc in `node_modules/effect/src` before using it. The installed source is the v4 truth. v3 names from memory, such as `Context.Tag`, `@effect/cli` and `catchAll`, are wrong here.
-- Every command returns data and pipes it through `present(toText)` (or `presentEach` for a stream) from `src/render.ts`, which prints the result or the error as text or JSON. Printing happens inside commands because the `--json` setting only exists in command context.
+- Every command returns data and pipes it through `present(toText)` (or `presentEach` for a stream) from `src/cli/render.ts`, which prints the result or the error as text or JSON. Printing happens inside commands because the `--json` setting only exists in command context.
 - Each error class carries its own exit code as `[Runtime.errorExitCode]`, with `[Runtime.errorReported] = false` so the runtime does not log it again. The codes are listed in `README.md`.
 - `Flag.Boolean` needs `Flag.withDefault(false)`, or the flag becomes required.
-- `src/page/` never imports Effect. Bump the agent's `version` whenever `agent.ts` changes, or Spotify keeps running the old copy.
+- `src/core/page/` never imports Effect. Bump the agent's `version` whenever `agent.ts` changes, or Spotify keeps running the old copy.
 - GraphQL queries are run by name. The agent reads each query's hash from Spotify's code, because the hash changes when Spotify changes the query. Never hardcode one.
 - Commands depend on `Spotify` (and `Launcher`), never on `Bridge` directly.
 - Decode everything Spotify returns with Schema in `raw.ts`, and turn decode failures into `InternalApiChanged` with `blameUpdate`.

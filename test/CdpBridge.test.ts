@@ -2,8 +2,8 @@ import { assert, describe, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { HttpClient, HttpClientResponse } from "effect/http"
 import { Socket } from "effect/socket"
-import { Bridge } from "../src/bridge/Bridge.ts"
-import { CdpBridge } from "../src/bridge/CdpBridge.ts"
+import { Bridge } from "../src/core/bridge/Bridge.ts"
+import { CdpBridge } from "../src/core/bridge/CdpBridge.ts"
 import { Port } from "../src/settings.ts"
 
 // A DevTools endpoint whose /json/list answers with `body`.

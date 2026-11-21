@@ -1,13 +1,13 @@
 import { assert, describe, it } from "@effect/vitest"
-import { PlayerStatus } from "../src/domain/PlayerStatus.ts"
-import { Check } from "../src/domain/Check.ts"
-import { Device } from "../src/domain/Device.ts"
-import { CreatedPlaylist, DeletedPlaylist, LikeResult, Playlist, PlaylistAddResult } from "../src/domain/Playlist.ts"
-import { Queue } from "../src/domain/Queue.ts"
-import { SearchResult } from "../src/domain/SearchResult.ts"
-import { SpotifyUri, Track } from "../src/domain/Track.ts"
-import { Volume, VolumeStatus } from "../src/domain/Volume.ts"
-import { searchText, volumeText, createdText, deletedText, devicesText, doctorText, launchText, likeText, watchText, playlistAddText, playlistsText, queueText, repeatText, shuffleText, statusText } from "../src/render.ts"
+import { PlayerStatus } from "../src/core/domain/PlayerStatus.ts"
+import { Check } from "../src/core/domain/Check.ts"
+import { Device } from "../src/core/domain/Device.ts"
+import { CreatedPlaylist, DeletedPlaylist, LikeResult, Playlist, PlaylistAddResult } from "../src/core/domain/Playlist.ts"
+import { Queue } from "../src/core/domain/Queue.ts"
+import { SearchResult } from "../src/core/domain/SearchResult.ts"
+import { SpotifyUri, Track } from "../src/core/domain/Track.ts"
+import { Volume, VolumeStatus } from "../src/core/domain/Volume.ts"
+import { searchText, volumeText, createdText, deletedText, devicesText, doctorText, launchText, likeText, watchText, playlistAddText, playlistsText, queueText, repeatText, shuffleText, statusText } from "../src/cli/render.ts"
 
 const track = new Track({
   uri: SpotifyUri.make("spotify:track:1111111111111111111111"),
