@@ -1,5 +1,5 @@
 import { Effect, Layer, Predicate, SchemaAST } from "effect"
-import { type RpcMessage, RpcSerialization, RpcServer } from "effect/rpc"
+import { OpenRpc, type RpcMessage, RpcSerialization, RpcServer } from "effect/rpc"
 import { Spotr } from "./core/operations.ts"
 
 const takesNothing = new Set<string>(Array.from(Spotr.requests.values()).flatMap((rpc) =>
@@ -29,3 +29,6 @@ export const serve = RpcServer.layer(Spotr).pipe(
   Layer.provide(stdio),
   Layer.provide(RpcSerialization.layerNdJsonRpc())
 )
+
+// What spotr serve speaks, as an OpenRPC document for client generators.
+export const openRpc = OpenRpc.fromRpcGroup(Spotr, { info: { title: "spotr", version: "0.1.0" } })
