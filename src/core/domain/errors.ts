@@ -1,4 +1,4 @@
-import { Runtime, Schema } from "effect"
+import { Runtime, Schema, SchemaTransformation } from "effect"
 
 export class ClientNotRunning extends Schema.TaggedError<
   ClientNotRunning,
@@ -205,3 +205,36 @@ export type SpotifyError =
   | LaunchFailed
   | SpotifyRefused
   | NeedsConfirmation
+
+type Explained = { readonly message: string; readonly hint: string; readonly detail: string }
+
+// message, hint and detail are getters, which encoding skips. On the wire
+// each error carries them as fields beside its own, so protocol clients
+// get the same text the CLI prints.
+const explained = <Self extends Explained, Encoded>(
+  error: Schema.Codec<Self, Encoded> & { readonly fields: Schema.Struct.Fields; new(props: Encoded): Self }
+) => {
+  const wire = Schema.Struct({ ...error.fields, message: Schema.String, hint: Schema.String, detail: Schema.String })
+
+  return wire.pipe(
+    Schema.decodeTo(
+      Schema.toType(error),
+      SchemaTransformation.transform({
+        // SAFETY: wire holds every field of error, so it is a valid Encoded.
+        decode: (fields) => new error(fields as Encoded),
+        encode: (self) => ({ ...self, message: self.message, hint: self.hint, detail: self.detail })
+      })
+    )
+  )
+}
+
+export const SpotifyError = Schema.Union([
+  explained(ClientNotRunning),
+  explained(BridgeTimeout),
+  explained(InternalApiChanged),
+  explained(NotFound),
+  explained(SpotifyWithoutDebugPort),
+  explained(LaunchFailed),
+  explained(SpotifyRefused),
+  explained(NeedsConfirmation)
+])

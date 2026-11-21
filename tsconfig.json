@@ -26,6 +26,8 @@
           "effect/http",
           "effect/socket",
           "effect/process",
+          "effect/rpc",
+          "effect/ai",
           "@effect/platform-node"
         ],
         "overrides": [
@@ -37,6 +39,8 @@
                 "effect/http",
                 "effect/socket",
                 "effect/process",
+                "effect/rpc",
+                "effect/ai",
                 "@effect/platform-node",
                 "effect/testing",
                 "@effect/vitest",

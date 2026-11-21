@@ -15,7 +15,9 @@ export class VolumeStatus extends Schema.Class<VolumeStatus, { readonly brand: u
 }) {}
 
 // A new volume: an absolute level, or a change to the current one.
-export type VolumeChange = { readonly relative: boolean; readonly amount: number }
+export const VolumeChange = Schema.Struct({ relative: Schema.Boolean, amount: Schema.Int })
+
+export type VolumeChange = typeof VolumeChange.Type
 
 // Accepts "40" (a level from 0 to 100), and "+10" or "-10" (a change).
 export const parseVolumeChange = (input: string): Option.Option<VolumeChange> => {
