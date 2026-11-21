@@ -66,6 +66,9 @@ While the port is open, other programs on this computer can control Spotify too.
 | `spotr watch` | Print a line whenever the track or play state changes. Ctrl+C stops |
 | `spotr launch` | Start Spotify with its DevTools port open |
 | `spotr doctor` | Check that spotr can reach and drive Spotify |
+| `spotr serve` | Serve every operation as JSON-RPC 2.0 on stdin and stdout |
+| `spotr mcp` | Serve every operation as an MCP tool on stdin and stdout |
+| `spotr schema` | Print the OpenRPC document for `spotr serve` |
 
 A deleted playlist can be recovered for a while at spotify.com/account/recover-playlists.
 
@@ -74,6 +77,35 @@ A deleted playlist can be recovered for a while at spotify.com/account/recover-p
 Wherever a command takes a URI, you can also paste an `open.spotify.com` link. Liked Songs (`spotify:collection:tracks`) and local files (`spotify:local:…`) work too.
 
 Every command accepts `--json` for machine-readable output, and `--port` (or `SPOTR_PORT`) for a DevTools port other than 9222. `watch --json` prints one JSON object per line.
+
+## Other programs: serve, mcp and schema
+
+Every command is an operation in one table, and three more commands offer that table to other programs. `--port` applies to all of them.
+
+`spotr serve` speaks JSON-RPC 2.0 on stdin and stdout, one message per line, so any language with a line reader can drive Spotify. Method names are the operation names (`status`, `play`, `seek`, `setVolume`, `search` and so on), and params are by name. An operation without arguments accepts no params, `{}` or `[]`.
+
+```
+$ printf '{"jsonrpc":"2.0","id":1,"method":"seek","params":{"relative":true,"ms":10000}}\n' | spotr serve
+{"jsonrpc":"2.0","id":1,"result":{"track":{…},"paused":false,"positionMs":93000,…}}
+```
+
+Payloads are structured: `seek` takes `{ relative, ms }` and `setVolume` takes `{ relative, amount }`, not the CLI's `+10`. `play` takes `{ what }`, which is a URI, a link, `liked`, or words to search for, and resumes when empty.
+
+A failed call returns a JSON-RPC error. `error.message` is spotr's message, and `error.data[0].error` carries the error's `_tag`, its fields, `message`, `hint` and `detail`, the same text the CLI prints:
+
+```json
+{"jsonrpc":"2.0","id":1,"error":{"_tag":"Cause","code":0,"message":"Spotify isn't reachable on port 9222","data":[{"_tag":"Fail","error":{"_tag":"ClientNotRunning","port":9222,"reason":"port","message":"Spotify isn't reachable on port 9222","hint":"Run spotr launch, or start Spotify with --remote-debugging-port=9222.","detail":"Nothing answered on http://127.0.0.1:9222/json/list"}}]}}
+```
+
+`watch` streams: each update arrives as `{"jsonrpc":"2.0","chunk":true,"id":…,"result":[status, …]}`, and the call never completes. To stop it, send `{"jsonrpc":"2.0","method":"@effect/rpc/Interrupt","params":{"requestId":"<id>"}}`, which ends the call with an error whose `data` holds an `Interrupt`. Closing stdin alone doesn't stop a running watch.
+
+`spotr schema` prints the OpenRPC document for `serve`, for generating clients. `doctor` succeeds with its list of checks; a failed check is in the list, not an error.
+
+`spotr mcp` is an MCP server on stdio with one tool per operation, except `watch`. Errors come back as the tool's result, with `isError` set. To use it from Claude Code:
+
+```bash
+claude mcp add spotr -- spotr mcp
+```
 
 ## Exit codes
 
