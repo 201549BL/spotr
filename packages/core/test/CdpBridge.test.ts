@@ -4,7 +4,7 @@ import { HttpClient, HttpClientResponse } from "effect/http"
 import { Socket } from "effect/socket"
 import { Bridge } from "../src/bridge/Bridge.ts"
 import { CdpBridge } from "../src/bridge/CdpBridge.ts"
-import { Port } from "../src/settings.ts"
+import { DevToolsPort } from "../src/DevToolsPort.ts"
 
 // A DevTools endpoint whose /json/list answers with `body`.
 const devToolsAnswering = (body: string) =>
@@ -14,7 +14,7 @@ const devToolsAnswering = (body: string) =>
       HttpClient.make((request) => Effect.succeed(HttpClientResponse.fromWeb(request, new Response(body))))
     )),
     Layer.provide(Socket.layerWebSocketConstructorGlobal),
-    Layer.provide(Layer.succeed(Port, 9222))
+    Layer.provide(Layer.succeed(DevToolsPort, 9222))
   )
 
 const failure = (body: string) =>

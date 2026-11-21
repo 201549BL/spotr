@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schedule, Schema } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { ClientNotRunning, LaunchFailed, type SpotifyError, SpotifyWithoutDebugPort } from "../domain/errors.ts"
-import { Port } from "../settings.ts"
+import { DevToolsPort } from "../DevToolsPort.ts"
 import { Spotify } from "./Spotify.ts"
 
 export class LaunchResult extends Schema.Class<LaunchResult, { readonly brand: unique symbol }>("LaunchResult")({
@@ -19,7 +19,7 @@ export class Launcher extends Context.Service<Launcher, {
     Effect.gen(function* () {
       const spotify = yield* Spotify
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-      const port = yield* Port
+      const port = yield* DevToolsPort
 
       const reachable = spotify.status.pipe(
         Effect.as(true),

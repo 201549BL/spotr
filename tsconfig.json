@@ -30,7 +30,7 @@
         ],
         "overrides": [
           {
-            "include": ["test/**/*.ts"],
+            "include": ["packages/*/test/**/*.ts"],
             "options": {
               "allowedUnstableApis": [
                 "effect/cli",
@@ -53,8 +53,8 @@
     ]
   },
   "include": [
-    "src",
-    "test",
+    "packages/*/src",
+    "packages/*/test",
     "scripts"
   ]
 }

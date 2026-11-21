@@ -5,7 +5,7 @@ import { TestClock } from "effect/testing"
 import { Bridge } from "../src/bridge/Bridge.ts"
 import { FakeBridge, sampleQueue } from "../src/bridge/FakeBridge.ts"
 import { ClientNotRunning, InternalApiChanged } from "../src/domain/errors.ts"
-import { Port } from "../src/settings.ts"
+import { DevToolsPort } from "../src/DevToolsPort.ts"
 import { Launcher } from "../src/spotify/Launcher.ts"
 import { Spotify } from "../src/spotify/Spotify.ts"
 
@@ -159,7 +159,7 @@ const launchWith = (ran: Ref.Ref<ReadonlyArray<string>>, bridge: Layer.Layer<Bri
       Launcher.layer.pipe(
         Layer.provide(Spotify.layer.pipe(Layer.provide(bridge))),
         Layer.provide(recordingSpawner(ran, codes)),
-        Layer.provide(Layer.succeed(Port, 9222))
+        Layer.provide(Layer.succeed(DevToolsPort, 9222))
       )
     )
   )

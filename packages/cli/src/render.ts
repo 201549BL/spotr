@@ -1,20 +1,20 @@
+import {
+  type Check,
+  type CreatedPlaylist,
+  type DeletedPlaylist,
+  type Device,
+  formatTime,
+  type LikeResult,
+  type PlayerStatus,
+  type Playlist,
+  type PlaylistAddResult,
+  type Queue,
+  type SearchResult,
+  type SpotifyError,
+  type Track,
+  type VolumeStatus
+} from "spotr-core"
 import { Console, Effect, Stream } from "effect"
-import type { Check } from "./domain/Check.ts"
-import type { Device } from "./domain/Device.ts"
-import type { SpotifyError } from "./domain/errors.ts"
-import type { PlayerStatus } from "./domain/PlayerStatus.ts"
-import type {
-  CreatedPlaylist,
-  DeletedPlaylist,
-  LikeResult,
-  Playlist,
-  PlaylistAddResult
-} from "./domain/Playlist.ts"
-import type { Queue } from "./domain/Queue.ts"
-import type { SearchResult } from "./domain/SearchResult.ts"
-import type { Track } from "./domain/Track.ts"
-import { formatTime } from "./domain/Seek.ts"
-import type { VolumeStatus } from "./domain/Volume.ts"
 import { Json } from "./settings.ts"
 
 // Commands return data. This is the one place that decides how it

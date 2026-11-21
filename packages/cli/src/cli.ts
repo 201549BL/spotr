@@ -1,12 +1,8 @@
+import { CdpBridge, ChecksFailed, DevToolsPort, Launcher, parseSeek, parseVolumeChange, Spotify, SpotifyUri, toPlayTarget, toSpotifyUri } from "spotr-core"
 import { Effect, Layer, Option, Schema } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
 import { FetchHttpClient } from "effect/http"
 import { Socket } from "effect/socket"
-import { CdpBridge } from "./bridge/CdpBridge.ts"
-import { ChecksFailed } from "./domain/errors.ts"
-import { parseSeek } from "./domain/Seek.ts"
-import { SpotifyUri, toPlayTarget, toSpotifyUri } from "./domain/Track.ts"
-import { parseVolumeChange } from "./domain/Volume.ts"
 import {
   searchText,
   createdText,
@@ -27,8 +23,6 @@ import {
   volumeText
 } from "./render.ts"
 import { Json, Port } from "./settings.ts"
-import { Launcher } from "./spotify/Launcher.ts"
-import { Spotify } from "./spotify/Spotify.ts"
 
 const uriArgument = (description: string) =>
   Argument.String("uri").pipe(
@@ -263,6 +257,10 @@ const toggle = Command.make("toggle", {}, () =>
   Spotify.use((spotify) => spotify.toggle).pipe(present(statusText))
 ).pipe(Command.withDescription("Pause if playing, resume if paused"))
 
+// The core reads the DevTools port from a service; the CLI fills it in
+// from --port (or SPOTR_PORT).
+const devToolsPort = Layer.effect(DevToolsPort, Port)
+
 export const spotr = Command.make("spotr").pipe(
   Command.withSubcommands([
     status,
@@ -291,7 +289,8 @@ export const spotr = Command.make("spotr").pipe(
   Command.provide(
     Spotify.layer.pipe(
       Layer.provide(CdpBridge),
-      Layer.provide([FetchHttpClient.layer, Socket.layerWebSocketConstructorGlobal])
+      Layer.provide([FetchHttpClient.layer, Socket.layerWebSocketConstructorGlobal]),
+      Layer.provideMerge(devToolsPort)
     )
   ),
   Command.withGlobalFlags([Json, Port]),

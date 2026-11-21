@@ -1,30 +1,26 @@
 {
-  "name": "spotr",
-  "version": "0.1.0",
+  "name": "spotr-workspace",
+  "private": true,
   "description": "Control the Spotify desktop app from your terminal",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/201549BL/spotr.git"
   },
-  "private": true,
   "type": "module",
   "engines": {
     "node": ">=24"
   },
-  "bin": {
-    "spotr": "src/main.ts"
-  },
+  "workspaces": [
+    "packages/core",
+    "packages/cli"
+  ],
   "scripts": {
     "typecheck": "effect-tsgo tsc -p tsconfig.json",
     "lint": "oxlint --deny-warnings",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm run test",
     "prepare": "lefthook install"
-  },
-  "dependencies": {
-    "@effect/platform-node": "4.1.4",
-    "effect": "4.1.4"
   },
   "devDependencies": {
     "@effect/tsgo": "0.70.0",

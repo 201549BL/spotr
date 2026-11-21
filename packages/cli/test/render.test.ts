@@ -1,12 +1,5 @@
+import { Check, CreatedPlaylist, DeletedPlaylist, Device, LikeResult, PlayerStatus, Playlist, PlaylistAddResult, Queue, SearchResult, SpotifyUri, Track, Volume, VolumeStatus } from "spotr-core"
 import { assert, describe, it } from "@effect/vitest"
-import { PlayerStatus } from "../src/domain/PlayerStatus.ts"
-import { Check } from "../src/domain/Check.ts"
-import { Device } from "../src/domain/Device.ts"
-import { CreatedPlaylist, DeletedPlaylist, LikeResult, Playlist, PlaylistAddResult } from "../src/domain/Playlist.ts"
-import { Queue } from "../src/domain/Queue.ts"
-import { SearchResult } from "../src/domain/SearchResult.ts"
-import { SpotifyUri, Track } from "../src/domain/Track.ts"
-import { Volume, VolumeStatus } from "../src/domain/Volume.ts"
 import { searchText, volumeText, createdText, deletedText, devicesText, doctorText, launchText, likeText, watchText, playlistAddText, playlistsText, queueText, repeatText, shuffleText, statusText } from "../src/render.ts"
 
 const track = new Track({
