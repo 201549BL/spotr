@@ -1,21 +1,21 @@
+import {
+  type Check,
+  type CreatedPlaylist,
+  type DeletedPlaylist,
+  type Device,
+  formatTime,
+  type LikeResult,
+  type PlayerStatus,
+  type Playlist,
+  type PlaylistAddResult,
+  type Queue,
+  type SearchResult,
+  type SpotifyError,
+  type Track,
+  type VolumeStatus
+} from "spotr-core"
 import { Console, Effect, Stream } from "effect"
-import type { Check } from "../core/domain/Check.ts"
-import type { Device } from "../core/domain/Device.ts"
-import type { SpotifyError } from "../core/domain/errors.ts"
-import type { PlayerStatus } from "../core/domain/PlayerStatus.ts"
-import type {
-  CreatedPlaylist,
-  DeletedPlaylist,
-  LikeResult,
-  Playlist,
-  PlaylistAddResult
-} from "../core/domain/Playlist.ts"
-import type { Queue } from "../core/domain/Queue.ts"
-import type { SearchResult } from "../core/domain/SearchResult.ts"
-import type { Track } from "../core/domain/Track.ts"
-import { formatTime } from "../core/domain/Seek.ts"
-import type { VolumeStatus } from "../core/domain/Volume.ts"
-import { Json } from "../settings.ts"
+import { Json } from "./settings.ts"
 
 // Commands return data. This is the one place that decides how it
 // looks: JSON with --json, otherwise the command's text format.

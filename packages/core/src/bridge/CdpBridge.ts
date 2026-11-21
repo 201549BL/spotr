@@ -3,7 +3,7 @@ import { HttpClient, HttpClientResponse } from "effect/http"
 import { Socket } from "effect/socket"
 import { BridgeTimeout, ClientNotRunning, InternalApiChanged } from "../domain/errors.ts"
 import { installAgent } from "../page/agent.ts"
-import { Port } from "../../settings.ts"
+import { DevToolsPort } from "../DevToolsPort.ts"
 import { Bridge } from "./Bridge.ts"
 import * as Cdp from "./Cdp.ts"
 
@@ -36,7 +36,7 @@ const AGENT_SOURCE = installAgent.toString()
 export const CdpBridge = Layer.effect(
   Bridge,
   Effect.gen(function* () {
-    const port = yield* Port
+    const port = yield* DevToolsPort
     const http = yield* HttpClient.HttpClient
     const webSocket = yield* Socket.WebSocketConstructor
 

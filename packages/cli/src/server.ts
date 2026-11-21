@@ -1,7 +1,6 @@
 import { Cause, Effect, FiberMap, Option, Runtime, Schema, SchemaAST, Stdio, Stream } from "effect"
 import { OpenRpc, RpcSchema, RpcTest } from "effect/rpc"
-import { SpotifyError } from "./core/domain/errors.ts"
-import { type Operation, Spotr } from "./core/operations.ts"
+import { type Operation, SpotifyError, Spotr } from "spotr-core"
 
 // The JSON-RPC 2.0 codes spotr uses besides each error's exit code.
 // -32800 is LSP's request-cancelled code, which StreamJsonRpc and

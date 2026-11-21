@@ -188,6 +188,7 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
     // Like Spotify's mute helper: any volume change records the last
     // non-zero level, and 0 counts as muted.
     const sound = yield* Ref.make({ level: 1, muted: false, behindMute: 1 })
+    const muteLag = yield* Ref.make(false)
 
     const changeLevel = (level: number) =>
       Ref.update(sound, (current) => ({
@@ -461,12 +462,27 @@ export const FakeBridge = (queue: ReadonlyArray<RawTrack>, staleReads: number) =
       ["ConnectDevicesAPI.getDevices", () => getDevices],
       ["ConnectTransferAPI.transferPlayback", transferPlayback],
       ["Test.transfers", () => getTransfers],
-      ["PlaybackAPI.getVolume", () => Ref.get(sound).pipe(Effect.map((current) => current.level))],
+      [
+        "PlaybackAPI.getVolume",
+        () =>
+          Effect.gen(function* () {
+            const { level } = yield* Ref.get(sound)
+
+            if (yield* Ref.getAndSet(muteLag, false)) yield* Ref.update(sound, (current) => ({ ...current, level: 0 }))
+
+            return level
+          })
+      ],
       ["PlaybackAPI.setVolume", setVolume],
       ["PlaybackAPI.getMuteHelper.isMuted", () => Ref.get(sound).pipe(Effect.map((current) => current.muted))],
+      // Like Spotify, mute flips the flag first; the volume reads as before
+      // once more, then drops to 0.
       [
         "PlaybackAPI.getMuteHelper.mute",
-        () => Ref.update(sound, (current) => current.muted ? current : { level: 0, muted: true, behindMute: current.level })
+        () =>
+          Ref.update(sound, (current) => current.muted ? current : { ...current, muted: true, behindMute: current.level }).pipe(
+            Effect.andThen(Ref.set(muteLag, true))
+          )
       ],
       [
         "PlaybackAPI.getMuteHelper.unmute",

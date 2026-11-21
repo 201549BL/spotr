@@ -1,0 +1,14 @@
+{
+  "name": "spotr-core",
+  "version": "0.1.0",
+  "description": "Connect to the Spotify desktop app and drive it through its internal APIs",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "effect": "4.1.4"
+  }
+}

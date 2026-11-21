@@ -1,7 +1,7 @@
 import { Effect, Layer, SchemaAST } from "effect"
 import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai"
 import { type Rpc, type RpcGroup, RpcSchema, RpcTest } from "effect/rpc"
-import { describe, type Operation, Spotr } from "./core/operations.ts"
+import { describe, type Operation, Spotr } from "spotr-core"
 
 type Stream = {
   [Tag in Operation["_tag"]]: [Rpc.IsStream<Operation, Tag>] extends [never] ? never : Tag

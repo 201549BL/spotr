@@ -1,11 +1,6 @@
+import { ChecksFailed, Client, describe, DevToolsPort, live, parseSeek, parseVolumeChange, SpotifyUri, toSpotifyUri } from "spotr-core"
 import { Console, Effect, Layer, Option, Schema } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
-import { ChecksFailed } from "../core/domain/errors.ts"
-import { parseSeek } from "../core/domain/Seek.ts"
-import { SpotifyUri, toSpotifyUri } from "../core/domain/Track.ts"
-import { parseVolumeChange } from "../core/domain/Volume.ts"
-import { Client, live } from "../core/handlers.ts"
-import { describe } from "../core/operations.ts"
 import {
   searchText,
   createdText,
@@ -25,9 +20,9 @@ import {
   statusText,
   volumeText
 } from "./render.ts"
-import { mcp as mcpServer } from "../mcp.ts"
-import { openRpc, serve as server } from "../server.ts"
-import { Json, Port } from "../settings.ts"
+import { mcp as mcpServer } from "./mcp.ts"
+import { openRpc, serve as server } from "./server.ts"
+import { Json, Port } from "./settings.ts"
 
 const uriArgument = (description: string) =>
   Argument.String("uri").pipe(
@@ -263,6 +258,10 @@ const schema = Command.make("schema", {}, () => Console.log(JSON.stringify(openR
   Command.withDescription("Print the OpenRPC document for spotr serve")
 )
 
+// The core reads the DevTools port from a service; the CLI fills it in
+// from --port (or SPOTR_PORT).
+const devToolsPort = Layer.effect(DevToolsPort, Port)
+
 export const spotr = Command.make("spotr").pipe(
   Command.withSubcommands([
     status,
@@ -291,7 +290,7 @@ export const spotr = Command.make("spotr").pipe(
     mcp,
     schema
   ]),
-  Command.provide(Client.layer.pipe(Layer.provideMerge(live))),
+  Command.provide(Client.layer.pipe(Layer.provideMerge(live), Layer.provideMerge(devToolsPort))),
   Command.withGlobalFlags([Json, Port]),
   Command.withDescription("Control the Spotify desktop app")
 )
