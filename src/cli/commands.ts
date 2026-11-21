@@ -25,6 +25,7 @@ import {
   statusText,
   volumeText
 } from "./render.ts"
+import { serve as server } from "../server.ts"
 import { Json, Port } from "../settings.ts"
 
 const uriArgument = (description: string) =>
@@ -249,6 +250,10 @@ const toggle = Command.make("toggle", {}, () =>
   Client.use((client) => client.toggle()).pipe(present(statusText))
 ).pipe(Command.withDescription(describe("toggle")))
 
+const serve = Command.make("serve", {}, () => Layer.launch(server)).pipe(
+  Command.withDescription("Serve every operation as JSON-RPC 2.0 on stdin and stdout, one message per line")
+)
+
 export const spotr = Command.make("spotr").pipe(
   Command.withSubcommands([
     status,
@@ -272,7 +277,8 @@ export const spotr = Command.make("spotr").pipe(
     unmute,
     watch,
     launch,
-    doctor
+    doctor,
+    serve
   ]),
   Command.provide(Client.layer.pipe(Layer.provideMerge(live))),
   Command.withGlobalFlags([Json, Port]),
