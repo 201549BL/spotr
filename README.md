@@ -91,13 +91,23 @@ $ printf '{"jsonrpc":"2.0","id":1,"method":"seek","params":{"relative":true,"ms"
 
 Payloads are structured: `seek` takes `{ relative, ms }` and `setVolume` takes `{ relative, amount }`, not the CLI's `+10`. `play` takes `{ what }`, which is a URI, a link, `liked`, or words to search for, and resumes when empty.
 
-A failed call returns a JSON-RPC error. `error.message` is spotr's message, and `error.data[0].error` carries the error's `_tag`, its fields, `message`, `hint` and `detail`, the same text the CLI prints:
+A failed call returns a JSON-RPC error. `code` is the error's exit code from the table below, `message` is spotr's message, and `data` carries the error's `_tag`, its fields, `message`, `hint` and `detail`, the same text the CLI prints:
 
 ```json
-{"jsonrpc":"2.0","id":1,"error":{"_tag":"Cause","code":0,"message":"Spotify isn't reachable on port 9222","data":[{"_tag":"Fail","error":{"_tag":"ClientNotRunning","port":9222,"reason":"port","message":"Spotify isn't reachable on port 9222","hint":"Run spotr launch, or start Spotify with --remote-debugging-port=9222.","detail":"Nothing answered on http://127.0.0.1:9222/json/list"}}]}}
+{"jsonrpc":"2.0","id":1,"error":{"code":3,"message":"Spotify isn't reachable on port 9222","data":{"_tag":"ClientNotRunning","port":9222,"reason":"port","message":"Spotify isn't reachable on port 9222","hint":"Run spotr launch, or start Spotify with --remote-debugging-port=9222.","detail":"Nothing answered on http://127.0.0.1:9222/json/list"}}}
 ```
 
-`watch` streams: each update arrives as `{"jsonrpc":"2.0","chunk":true,"id":…,"result":[status, …]}`, and the call never completes. To stop it, send `{"jsonrpc":"2.0","method":"@effect/rpc/Interrupt","params":{"requestId":"<id>"}}`, which ends the call with an error whose `data` holds an `Interrupt`. Closing stdin alone doesn't stop a running watch.
+A request spotr can't run gets JSON-RPC's own codes: `-32700` for a line that isn't JSON, `-32600` for JSON that isn't a request, `-32601` for an unknown method, and `-32602` for params that don't fit the operation, with the problem in `message`.
+
+Requests run concurrently and may answer out of order, so match answers by `id`. A request without an `id` runs and gets no answer.
+
+`watch` streams. Each update is a notification named after the operation, carrying the request's id:
+
+```json
+{"jsonrpc":"2.0","method":"watch","params":{"id":7,"value":{"track":{…},"paused":false,…}}}
+```
+
+To stop it, send `{"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":7}}`, the cancel message LSP, StreamJsonRpc and vscode-jsonrpc use. The call then answers with code `-32800`. Cancelling works on any running request. When stdin closes, spotr cancels every stream, answers the calls still running, and exits.
 
 `spotr schema` prints the OpenRPC document for `serve`, for generating clients. `doctor` succeeds with its list of checks; a failed check is in the list, not an error.
 
